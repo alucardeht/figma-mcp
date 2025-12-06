@@ -83,6 +83,15 @@ class FigmaMCPServer {
               args.total_agents || 1
             );
             break;
+          case "get_full_page_context":
+            result = await handlers.getFullPageContext(
+              this.ctx,
+              args.file_key,
+              args.page_name,
+              args.frame_name,
+              args.scale || 2
+            );
+            break;
           case "repeat_last":
             result = handlers.repeatLast(this.ctx);
             break;

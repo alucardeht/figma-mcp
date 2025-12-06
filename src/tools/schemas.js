@@ -396,4 +396,58 @@ TYPICAL WORKFLOW:
       required: ["file_key", "page_name", "frame_name", "section_id"],
     },
   },
+  {
+    name: "get_full_page_context",
+    description: `Get complete page context in ONE call with all sections, assets, screenshots, and styles.
+
+WHAT YOU GET IN ONE CALL:
+- Complete page structure with all sections identified
+- Screenshots for each section (base64 encoded)
+- All assets organized by section with unique names
+- Design tokens per section
+- Asset map for quick lookup
+- Agent instructions ready for parallel implementation
+- Transition elements that span multiple sections
+
+PERFECT FOR:
+- Getting full context before implementation
+- Preparing data for parallel multi-agent work
+- Quick assessment of page complexity
+- One-call solution for complete page understanding
+
+RETURNS:
+- overview: Frame metadata and recommendations
+- sections: Array with all section details including screenshots
+- assetMap: Quick lookup table for assets by unique name
+- agentInstructions: Pre-written instructions for each agent
+- transitionElements: Elements spanning multiple sections
+
+TYPICAL WORKFLOW:
+1. get_full_page_context → get everything at once
+2. Distribute sections to multiple agents using agentInstructions
+3. Each agent implements their section with all necessary context`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        file_key: {
+          type: "string",
+          description: "Figma file key from URL",
+        },
+        page_name: {
+          type: "string",
+          description: "Page name (partial match)",
+        },
+        frame_name: {
+          type: "string",
+          description: "Frame name (partial match)",
+        },
+        scale: {
+          type: "number",
+          description: "Screenshot scale 1-4 (default: 2)",
+          default: 2,
+        },
+      },
+      required: ["file_key", "page_name", "frame_name"],
+    },
+  },
 ];

@@ -9,6 +9,7 @@ class SessionManager {
     this.exploredFrames = new Set();
     this.pendingChunks = new Map();
     this.lastResponse = null;
+    this.cache = new Map();
     this.lastUpdated = Date.now();
   }
 
@@ -75,12 +76,22 @@ class SessionManager {
     return this.lastResponse;
   }
 
+  getCachedData(key) {
+    return this.cache.get(key);
+  }
+
+  setCachedData(key, data) {
+    this.cache.set(key, data);
+    this.lastUpdated = Date.now();
+  }
+
   getState() {
     return {
       currentFile: this.currentFile,
       exploredPages: Array.from(this.exploredPages),
       exploredFrames: Array.from(this.exploredFrames),
       pendingOperations: Array.from(this.pendingChunks.keys()),
+      cachedDataKeys: Array.from(this.cache.keys()),
       hasLastResponse: this.lastResponse !== null,
       lastUpdated: new Date(this.lastUpdated).toISOString(),
     };
