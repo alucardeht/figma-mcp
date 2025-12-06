@@ -1,4 +1,5 @@
 import { colorToHex, extractFillInfo } from "./colors.js";
+import { isImageNode, isCompositeGroup } from "./assetHelpers.js";
 
 export function countElements(node) {
   if (!node) return 0;
@@ -27,6 +28,18 @@ export function analyzeFrame(node, depth, currentDepth = 0) {
       width: Math.round(node.absoluteBoundingBox.width),
       height: Math.round(node.absoluteBoundingBox.height),
     };
+
+    const width = node.absoluteBoundingBox.width;
+    const height = node.absoluteBoundingBox.height;
+    if (width < 20 || height < 20) {
+      result.isSmallElement = true;
+      result.hint = "Small UI element - may need special attention";
+    }
+  }
+
+  if (isCompositeGroup(node)) {
+    result.isCompositeAsset = true;
+    result.hint = "Export this group as single image - contains image + decorative shapes";
   }
 
   if (node.type === "TEXT") {

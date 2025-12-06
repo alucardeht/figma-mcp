@@ -32,6 +32,50 @@ export function isImageNode(node) {
   return hasImageFill || (node.type === "RECTANGLE" && hasImageKeyword);
 }
 
+export function isCompositeGroup(node) {
+  if (node.type !== 'GROUP' && node.type !== 'FRAME') return false;
+  if (!node.children || node.children.length < 2) return false;
+
+  let hasMainImage = false;
+  let hasDecorativeShapes = false;
+
+  function hasImageFill(n) {
+    return n.fills?.some(f => f.type === 'IMAGE' || f.type === 'image');
+  }
+
+  function countShapesRecursive(n) {
+    let count = 0;
+    if (['RECTANGLE', 'ELLIPSE', 'VECTOR', 'POLYGON', 'STAR', 'LINE'].includes(n.type)) {
+      if (!hasImageFill(n)) count++;
+    }
+    if (n.children) {
+      for (const child of n.children) {
+        count += countShapesRecursive(child);
+      }
+    }
+    return count;
+  }
+
+  for (const child of node.children) {
+    if (hasImageFill(child)) {
+      hasMainImage = true;
+    }
+    else if (child.type === 'GROUP') {
+      const shapeCount = countShapesRecursive(child);
+      if (shapeCount > 0) {
+        hasDecorativeShapes = true;
+      }
+    }
+    else if (['RECTANGLE', 'ELLIPSE', 'VECTOR', 'POLYGON', 'STAR', 'LINE'].includes(child.type)) {
+      if (!hasImageFill(child)) {
+        hasDecorativeShapes = true;
+      }
+    }
+  }
+
+  return hasMainImage && hasDecorativeShapes;
+}
+
 const SECTION_KEYWORDS = [
   "hero",
   "about",
@@ -142,6 +186,49 @@ export function findAssets(node, options = {}) {
 
   const currentPath = [...path, node.name];
 
+  const isComposite = isCompositeGroup(node);
+
+  if (isComposite) {
+    const section = getSectionFromPath(currentPath);
+    const parentName = currentPath.length > 1 ? currentPath[currentPath.length - 2] : null;
+    const assetPath = filterPathSegments(currentPath);
+
+    let uniqueName = buildAssetName(assetPath, {
+      sectionName: section,
+      parentName,
+    });
+
+    const countKey = uniqueName;
+    const count = (nameCountMap.get(countKey) || 0) + 1;
+    nameCountMap.set(countKey, count);
+
+    if (count > 1) {
+      uniqueName = buildAssetName(assetPath, {
+        sectionName: section,
+        parentName,
+        index: count - 1,
+      });
+    }
+
+    assets.push({
+      id: node.id,
+      name: uniqueName,
+      originalName: node.name,
+      category: "image",
+      type: "composite-image",
+      bounds: node.absoluteBoundingBox || { x: 0, y: 0, width: 0, height: 0 },
+      path: currentPath,
+      sectionId: sectionId,
+      parentName: parentName ? sanitizeName(parentName) : null,
+      depth: currentPath.length - 1,
+      isComposite: true,
+      exportAs: 'PNG',
+      description: 'Composite group (image + decorative shapes) - export as single image'
+    });
+
+    return assets;
+  }
+
   const isIcon = isIconNode(node);
   const isImage = isImageNode(node);
 
@@ -181,7 +268,7 @@ export function findAssets(node, options = {}) {
     });
   }
 
-  if (node.children && !isIcon && !isImage) {
+  if (node.children && !isIcon && !isImage && !isComposite) {
     node.children.forEach((child) => {
       assets.push(
         ...findAssets(child, {

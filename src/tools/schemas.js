@@ -56,11 +56,18 @@ TYPICAL WORKFLOW:
     name: "get_frame_info",
     description: `Get detailed info about a specific frame.
 
+IMPORTANT: This should be your FIRST call for any implementation task.
+Always call get_frame_info BEFORE taking screenshots to understand the structure.
+
 HOW IT WORKS:
 - Returns all components, text, colors, and styles
 - Large frames (>1000 elements) trigger warning with strategy
 - Use depth parameter to control detail level
 - Automatically chunks if response too large
+
+The tree includes special markers:
+- isCompositeAsset: true = Export this GROUP as a single image (contains image + shapes)
+- isSmallElement: true = Small UI element that may be easily missed
 
 TYPICAL WORKFLOW:
 1. list_frames → find frame name
@@ -87,6 +94,10 @@ TYPICAL WORKFLOW:
     name: "get_screenshot",
     description: `Capture screenshot of a frame.
 
+WARNING: Do NOT use screenshots as the first step!
+Always call get_frame_info first to understand the structure.
+Screenshots are for visual reference AFTER you understand the tree.
+
 HOW IT WORKS:
 - For large frames, automatically segments into tiles
 - Returns base64 image(s)
@@ -94,8 +105,8 @@ HOW IT WORKS:
 
 TYPICAL WORKFLOW:
 1. list_frames → find frame
-2. get_screenshot → visual reference
-3. get_frame_info → structure details`,
+2. get_frame_info → structure details
+3. get_screenshot → visual reference`,
     inputSchema: {
       type: "object",
       properties: {
@@ -136,13 +147,16 @@ TYPICAL WORKFLOW:
     description: `Extract all assets from a frame with progress tracking.
 
 HOW IT WORKS:
-- Automatically categorizes into icons/ and images/
+- Detects "composite groups" (image + decorative shapes) and exports them as single PNG
+- For composite groups, the ENTIRE group is exported as one image, preserving layout
+- Automatically categorizes into icons/, images/, and images/composites/
 - Uses smart naming based on component hierarchy
-- Shows progress: "Processing batch 1/5 - found 8 icons, 3 images"
+- Shows progress: "Processing batch 1/5 - found 8 icons, 3 images, 2 composites"
 - Final summary with all file paths
+- Look for "isCompositeAsset: true" in the frame tree to identify composite groups
 
 TYPICAL WORKFLOW:
-1. get_frame_info → see what assets exist
+1. get_frame_info → see what assets exist and identify composite groups
 2. extract_assets → download all
 3. Check summary for file paths`,
     inputSchema: {
