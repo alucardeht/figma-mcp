@@ -247,4 +247,153 @@ USE WHEN:
       properties: {},
     },
   },
+  {
+    name: "analyze_page_structure",
+    description: `Analyze page structure BEFORE any implementation.
+
+MUST BE CALLED FIRST for any large page/frame.
+
+HOW IT WORKS:
+- Identifies sections by background color changes
+- Detects transition elements spanning multiple sections
+- Groups icons by section
+- Estimates token usage
+- Recommends agent count for parallel work
+
+RETURNS:
+- sections: List with id, name, bgColor, bounds, complexity
+- transition_elements: Elements spanning multiple sections
+- icons_by_section: Icons organized by section
+- total_estimated_tokens: Token estimate for full frame
+- recommended_division: 'single' or 'multiple'
+- recommended_agent_count: How many agents to use
+
+TYPICAL WORKFLOW:
+1. analyze_page_structure → understand structure
+2. If recommended_division='multiple': use get_section_screenshot
+3. Each agent uses get_agent_context for its section`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        file_key: {
+          type: "string",
+          description: "Figma file key from URL",
+        },
+        page_name: {
+          type: "string",
+          description: "Page name (partial match)",
+        },
+        frame_name: {
+          type: "string",
+          description: "Frame name (partial match)",
+        },
+      },
+      required: ["file_key", "page_name", "frame_name"],
+    },
+  },
+  {
+    name: "get_section_screenshot",
+    description: `Capture screenshot of a specific section within a frame.
+
+HOW IT WORKS:
+- First call analyze_page_structure to identify sections
+- Makes other sections transparent (shows only target section)
+- Optionally includes transition elements context
+- Returns cropped image focused on section
+- Useful for parallel analysis of large frames
+
+TYPICAL WORKFLOW:
+1. analyze_page_structure → identify sections
+2. get_section_screenshot(sectionId) → capture isolated section
+3. get_frame_info with section context → implementation details`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        file_key: {
+          type: "string",
+          description: "Figma file key from URL",
+        },
+        page_name: {
+          type: "string",
+          description: "Page name (partial match)",
+        },
+        frame_name: {
+          type: "string",
+          description: "Frame name (partial match)",
+        },
+        section_id: {
+          type: "string",
+          description: "Section ID from analyze_page_structure (e.g., 'section-0')",
+        },
+        include_transition_context: {
+          type: "boolean",
+          description: "Include margin context for transition elements (default: true)",
+          default: true,
+        },
+        scale: {
+          type: "number",
+          description: "Image scale 1-4 (default: 2)",
+          default: 2,
+        },
+      },
+      required: ["file_key", "page_name", "frame_name", "section_id"],
+    },
+  },
+  {
+    name: "get_agent_context",
+    description: `Prepare agent context for parallel implementation of a section.
+
+HOW IT WORKS:
+- Call after analyze_page_structure to identify sections
+- Returns complete context for a single agent to implement one section
+- Handles responsibilities: what to implement vs coordinate
+- Includes icons, styles, and transition element info
+- Generates agent-specific instructions with coordination rules
+
+RETURNS:
+- section: Details (id, name, background color, bounds)
+- responsibilities: what agent implements, coordinates, or skips
+- assets: icons and images in this section
+- styles: colors, fonts, spacing specific to section
+- agent_info: index, total agents, is_first, is_last
+- instructions: detailed markdown instructions for this agent
+
+TYPICAL WORKFLOW:
+1. analyze_page_structure → identify sections
+2. For each section: get_section_screenshot → visual reference
+3. get_agent_context(sectionId, agentIndex) → agent-specific context
+4. Each agent implements using provided context`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        file_key: {
+          type: "string",
+          description: "Figma file key from URL",
+        },
+        page_name: {
+          type: "string",
+          description: "Page name (partial match)",
+        },
+        frame_name: {
+          type: "string",
+          description: "Frame name (partial match)",
+        },
+        section_id: {
+          type: "string",
+          description: "Section ID from analyze_page_structure (e.g., 'section-0')",
+        },
+        agent_index: {
+          type: "number",
+          description: "Zero-based agent index (default: 0)",
+          default: 0,
+        },
+        total_agents: {
+          type: "number",
+          description: "Total number of agents working in parallel (default: 1)",
+          default: 1,
+        },
+      },
+      required: ["file_key", "page_name", "frame_name", "section_id"],
+    },
+  },
 ];

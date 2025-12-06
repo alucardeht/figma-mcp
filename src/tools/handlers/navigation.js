@@ -1,4 +1,5 @@
 import { countElements, analyzeFrame } from "../../utils/index.js";
+import { identifySections } from "../../utils/segmentation.js";
 
 export async function listPages(ctx, fileKey, continueFlag = false) {
   const { session, chunker, figmaClient } = ctx;
@@ -162,6 +163,40 @@ export async function getFrameInfo(ctx, fileKey, pageName, frameName, depth, con
 
   const frame = await figmaClient.getNode(fileKey, frameRef.id);
   const childCount = countElements(frame);
+  const { tokenEstimator } = ctx;
+
+  const estimatedTokens = tokenEstimator ? tokenEstimator.estimate(frame) : null;
+
+  if (estimatedTokens && estimatedTokens > 10000) {
+    const { sections } = identifySections(frame);
+
+    const response = chunker.wrapResponse(
+      {
+        warning: "Frame muito grande para processar diretamente",
+        estimated_tokens: estimatedTokens,
+        element_count: childCount,
+        recommended_action: "Use analyze_page_structure primeiro",
+        detected_sections: sections.map((s) => ({
+          name: s.name,
+          background: s.bgColor,
+          y_range: `${Math.round(s.y_start)}-${Math.round(s.y_end)}`,
+          complexity: s.estimated_complexity,
+          section_id: s.id,
+        })),
+      },
+      {
+        step: "Large frame detected",
+        alert: `Frame com ~${estimatedTokens} tokens estimados (${childCount} elementos)`,
+        strategy:
+          "Use analyze_page_structure para dividir em seções menores e processar com segurança",
+        nextStep:
+          "analyze_page_structure → getSectionScreenshot → getAgentContext",
+        recommendation:
+          "Divida o trabalho usando as seções identificadas acima",
+      }
+    );
+    return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+  }
 
   if (childCount > 1000) {
     const summary = analyzeFrame(frame, 1);

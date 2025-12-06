@@ -66,6 +66,23 @@ class FigmaMCPServer {
           case "get_file_styles":
             result = await handlers.getFileStyles(this.ctx, args.file_key);
             break;
+          case "analyze_page_structure":
+            result = await handlers.analyzePageStructure(this.ctx, args.file_key, args.page_name, args.frame_name);
+            break;
+          case "get_section_screenshot":
+            result = await handlers.getSectionScreenshot(this.ctx, args.file_key, args.page_name, args.frame_name, args.section_id, args.include_transition_context !== false, args.scale || 2);
+            break;
+          case "get_agent_context":
+            result = await handlers.getAgentContext(
+              this.ctx,
+              args.file_key,
+              args.page_name,
+              args.frame_name,
+              args.section_id,
+              args.agent_index || 0,
+              args.total_agents || 1
+            );
+            break;
           case "repeat_last":
             result = handlers.repeatLast(this.ctx);
             break;
