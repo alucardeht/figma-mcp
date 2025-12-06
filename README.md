@@ -36,38 +36,13 @@ v3.0.0 — Intelligent context management, smart pagination, and efficient asset
 
 ## Installation
 
-The easiest way to use mcp-server-figma is via **npx** in your Claude client configuration.
-
-### Claude Desktop Configuration
-
-Add this to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "figma": {
-      "command": "npx",
-      "args": ["-y", "github:alucardeht/mcp-server-figma"],
-      "env": {
-        "FIGMA_API_TOKEN": "your-figma-token-here"
-      }
-    }
-  }
-}
-```
-
-### Manual Installation
+### Claude Code
 
 ```bash
-git clone https://github.com/alucardeht/mcp-server-figma
-cd mcp-server-figma
-npm install
-npm start
+claude mcp add figma -e FIGMA_API_TOKEN=your-token-here -- npx -y github:alucardeht/mcp-server-figma
 ```
 
----
-
-## Getting Your Figma API Token
+### Get your Figma Token
 
 1. Open [Figma Settings](https://figma.com/settings)
 2. Navigate to **Personal access tokens**
