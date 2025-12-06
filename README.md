@@ -25,6 +25,24 @@ claude mcp add figma -e FIGMA_API_TOKEN=your-token-here -- npx -y github:alucard
 
 ---
 
+## Requirements
+
+### Figma Plan
+
+The Figma REST API works with any plan, but **rate limits differ significantly**:
+
+| Plan | File Access | Rate Limit |
+|------|-------------|------------|
+| **Starter (Free)** | 6 requests/month | Impractical for real use |
+| **Professional** | Unlimited | 120 req/min |
+| **Organization** | Unlimited | 480 req/min |
+
+**Important:** Free accounts are limited to **6 API calls per month** for file content. This makes the MCP server impractical without a paid plan.
+
+Dev Mode is **not required** — this MCP uses the REST API, not Dev Mode features.
+
+---
+
 ## Features
 
 ### Compact Tree Output (NEW in v3.0)
