@@ -1,203 +1,285 @@
-# Figma MCP Server v2.0
+# mcp-server-figma
 
-MCP server inteligente para Figma com navegação conversacional, extração de assets organizada e respeito a rate limits.
+[![npm version](https://img.shields.io/npm/v/mcp-server-figma.svg)](https://www.npmjs.com/package/mcp-server-figma)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Características Principais
+**A powerful Model Context Protocol (MCP) server for seamless Figma integration**
 
-- **Navegação por nome** - Busca páginas e frames por nome (partial match), sem precisar de IDs
-- **Output compacto** - JSON estruturado que não estoura a janela de contexto
-- **Rate limiting inteligente** - Respeita os tiers da API do Figma automaticamente
-- **Cache de requests** - Evita chamadas duplicadas à API
-- **Assets organizados** - Separa automaticamente em `icons/` e `images/`
-- **Extração de design tokens** - Cores, fontes, espaçamentos como JSON
-- **Screenshots segmentados** - Divide frames grandes em tiles menores
+v3.0.0 — Intelligent context management, smart pagination, and efficient asset extraction.
 
-## Instalação
+---
 
-```bash
-npm install
-export FIGMA_API_TOKEN="seu-token-aqui"
-```
+## Features
 
-### Como obter o token do Figma:
-1. Acesse https://www.figma.com/
-2. Vá em Settings > Account > Personal access tokens
-3. Crie um novo token
-4. Copie e use na variável de ambiente acima
+### Intelligent Context Management
+- **Smart Pagination**: Automatically pages large result sets (20 items per page)
+- **Token Estimation**: Warns users when results are large before fetching
+- **Continue Pattern**: Resume pagination with `continue=true` parameter
+- **Session State**: Maintains context across multiple requests
 
-## Configuração no Claude Desktop
+### Smart Navigation
+- **Name-Based Access**: Navigate files and frames using human-readable names—no IDs required
+- **Repeat Last**: Instantly replay the previous response from cache with `repeat_last()`
+- **Session Control**: View and reset session state for debugging
+
+### Asset Management
+- **Organized Extraction**: Automatically structures exported assets into `icons/` and `images/` folders
+- **Design Token Export**: Extract published styles, colors, and typography as design tokens
+- **Smart Scaling**: Configurable screenshot dimensions with intelligent aspect ratio preservation
+
+### Performance & Reliability
+- **Rate Limit Management**: Built-in awareness of Figma's API rate limits
+- **Efficient Batching**: Reduces API calls through intelligent request bundling
+- **Graceful Degradation**: Clear warnings and fallbacks when approaching rate limits
+
+---
+
+## Installation
+
+The easiest way to use mcp-server-figma is via **npx** in your Claude client configuration.
+
+### Claude Desktop Configuration
+
+Add this to your `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "figma": {
-      "command": "node",
-      "args": ["/caminho/para/figma-mcp-server/index.js"],
+      "command": "npx",
+      "args": ["-y", "github:alucardeht/mcp-server-figma"],
       "env": {
-        "FIGMA_API_TOKEN": "seu-token-aqui"
+        "FIGMA_API_TOKEN": "your-figma-token-here"
       }
     }
   }
 }
 ```
 
-## Tools Disponíveis
+### Manual Installation
 
-### 1. `list_pages`
-Lista todas as páginas de um arquivo Figma.
-
-```
-"Quais páginas tem no arquivo figma.com/design/ABC123?"
-```
-
-**Retorna:** Nome, ID e quantidade de frames de cada página.
-
-### 2. `list_frames`
-Lista frames dentro de uma página específica. Busca por nome (partial match).
-
-```
-"Me mostra os frames da página 'Mobile'"
+```bash
+git clone https://github.com/alucardeht/mcp-server-figma
+cd mcp-server-figma
+npm install
+npm start
 ```
 
-**Retorna:** Nome, dimensões, tipo e quantidade de filhos de cada frame.
+---
 
-### 3. `get_frame_info`
-Obtém informações detalhadas de um frame: componentes, textos, cores, estilos.
+## Getting Your Figma API Token
+
+1. Open [Figma Settings](https://figma.com/settings)
+2. Navigate to **Personal access tokens**
+3. Click **Create a new token**
+4. Give it a name (e.g., "MCP Server")
+5. Copy the token immediately (it won't be shown again)
+6. Add it to your Claude configuration as `FIGMA_API_TOKEN`
+
+**Permissions needed**: Read-only access to your files (the token is automatically scoped correctly)
+
+---
+
+## Available Tools
+
+### Navigation & Discovery
+
+#### `list_pages(file_key, continue?)`
+Lists all pages in a Figma file.
+- **file_key**: The file ID or URL
+- **continue?**: `true` to fetch the next page of results
+- **Returns**: Array of pages with names and metadata
+
+#### `list_frames(file_key, page_name, continue?)`
+Lists all frames/artboards on a specific page.
+- **file_key**: The file ID
+- **page_name**: Human-readable page name (e.g., "Components")
+- **continue?**: `true` to fetch more results
+- **Returns**: Frame names, dimensions, and positions
+
+#### `get_frame_info(file_key, page_name, frame_name, depth?, continue?)`
+Gets detailed information about a frame, including its contents and structure.
+- **file_key**: The file ID
+- **page_name**: Page name
+- **frame_name**: Frame/component name
+- **depth?**: Nesting depth to explore (default: 2)
+- **continue?**: Pagination for large frames
+- **Returns**: Nested structure with all elements, text, and properties
+
+### Content Extraction
+
+#### `get_screenshot(file_key, page_name, frame_name, scale?, max_dimension?)`
+Exports a frame as an image.
+- **file_key**: The file ID
+- **page_name**: Page name
+- **frame_name**: Frame name
+- **scale?**: Export scale (default: 2, max: 4)
+- **max_dimension?**: Resize if larger than this (in pixels)
+- **Returns**: Base64-encoded PNG image
+
+#### `extract_styles(file_key, page_name, frame_name)`
+Exports design tokens (colors, typography, effects) from a frame.
+- **Returns**: Colors, text styles, shadows, and other design properties
+
+#### `extract_assets(file_key, page_name, frame_name, output_dir?)`
+Exports all SVG and image assets from a frame.
+- **output_dir?**: Directory to save assets (default: current directory)
+- **Returns**: Organized files in `icons/` and `images/` subdirectories
+
+### Search & Browse
+
+#### `search_components(file_key, query, page_name?, type?, continue?)`
+Finds components matching a search query.
+- **file_key**: The file ID
+- **query**: Search term (e.g., "button", "icon")
+- **page_name?**: Limit search to a specific page
+- **type?**: Filter by type (component, instance, etc.)
+- **continue?**: Fetch more results
+- **Returns**: Matching components with paths and metadata
+
+#### `get_file_styles(file_key)`
+Lists all published styles (colors, typography) in the file.
+- **Returns**: Organized style library
+
+### Session & State Management
+
+#### `repeat_last()`
+Instantly replays the previous tool response without making a new API call.
+- **Use case**: You asked for a large list, got the first 20 items, and want to review them again
+- **Returns**: Cached response from the previous call
+
+#### `get_session_state()`
+Shows the current session state, including pagination cursors and cached results.
+- **Returns**: Active cursors, cached data, and conversation history
+
+#### `reset_session()`
+Clears all cached data and pagination state.
+- **Use case**: Start fresh with a new file or reset confused pagination
+
+---
+
+## How It Works: The Continue Pattern
+
+When you request a large list, mcp-server-figma automatically returns **the first 20 items** and tells you there are more available:
 
 ```
-"Me dá os detalhes do frame 'Login Screen' na página 'Mobile'"
+Frames in "Components" page:
+1. Button
+2. Card
+3. Modal
+4. ...
+19. Badge
+20. Avatar
+
+[20 items shown] More results available. Use continue=true to fetch the next page.
 ```
 
-**Parâmetros:**
-- `depth`: Profundidade de análise (1-4, default: 2)
+To get the next page, simply call the same tool with `continue=true`:
 
-**Retorna:** Árvore de componentes com bounds, fills, strokes, effects, layout, etc.
-
-### 4. `get_screenshot`
-Captura screenshot de um frame. Segmenta automaticamente frames grandes.
-
-```
-"Captura o frame 'Dashboard' da página 'Desktop'"
+```javascript
+list_frames("file_key", "Components", true)  // Fetches items 21-40
 ```
 
-**Parâmetros:**
-- `scale`: 1-4 (default: 2)
-- `max_dimension`: Tamanho máximo antes de segmentar (default: 4096)
+This pattern:
+- **Saves tokens** by not sending huge lists upfront
+- **Improves UX** by showing results progressively
+- **Respects rate limits** by pacing API calls
 
-**Retorna:** Imagem base64 (ou múltiplos tiles se for muito grande).
+---
 
-### 5. `extract_styles`
-Extrai todos os design tokens de um frame.
+## Example Workflow
 
-```
-"Extrai os estilos do frame 'Home'"
-```
-
-**Retorna:**
-```json
-{
-  "designTokens": {
-    "colors": ["#FFFFFF", "#000000", "#3B82F6"],
-    "fonts": ["Inter", "Roboto"],
-    "fontSizes": [12, 14, 16, 24],
-    "borderRadii": [4, 8, 16],
-    "spacing": [8, 12, 16, 24],
-    "shadows": [...]
-  }
-}
-```
-
-### 6. `extract_assets`
-Extrai todos os assets de um frame, organizando em pastas.
+### Scenario: Exporting a design system library
 
 ```
-"Extrai os assets do frame 'Onboarding' e salva em ./assets"
+1. User: "Show me the components in my Figma file"
+   → Tool: list_pages(file_key)
+   → Result: ["Home", "Components", "Icons", "Documentation"]
+
+2. User: "Show me all frames on the Components page"
+   → Tool: list_frames(file_key, "Components")
+   → Result: 45 frames found, showing first 20
+
+3. User: "Get more frames"
+   → Tool: list_frames(file_key, "Components", continue=true)
+   → Result: Next 20 frames (21-40)
+
+4. User: "Show me the Button component structure"
+   → Tool: get_frame_info(file_key, "Components", "Button")
+   → Result: Nested structure with all variants and states
+
+5. User: "Export the Button colors and typography"
+   → Tool: extract_styles(file_key, "Components", "Button")
+   → Result: Design tokens (hex colors, font sizes, line heights)
+
+6. User: "Save all icons as SVG"
+   → Tool: extract_assets(file_key, "Icons", "All", "./exported")
+   → Result: Files saved to icons/ and images/ folders
 ```
 
-**Organização automática:**
-```
-output_dir/
-├── icons/
-│   ├── arrow-left.svg
-│   ├── menu-icon.svg
-│   └── logo.svg
-└── images/
-    ├── hero-banner.png
-    └── profile-avatar.png
-```
-
-**Detecção inteligente:**
-- Ícones: Elementos com keywords (icon, arrow, chevron, logo) ou vetores pequenos → SVG
-- Imagens: Elementos com image fill ou keywords (photo, banner, hero) → PNG
-
-### 7. `search_components`
-Busca componentes por nome em todo o arquivo ou página específica.
-
-```
-"Busca todos os 'Button' no arquivo"
-"Busca 'Icon' só na página 'Design System'"
-```
-
-**Parâmetros:**
-- `query`: Termo de busca (case-insensitive)
-- `page_name`: Opcional, limita a busca
-- `type`: Filtro por tipo (COMPONENT, INSTANCE, FRAME, TEXT, VECTOR, etc.)
-
-### 8. `get_file_styles`
-Obtém estilos publicados do design system (cores, textos, efeitos).
-
-```
-"Quais são os estilos definidos no arquivo?"
-```
-
-## Workflow Típico
-
-```
-1. "Quais páginas tem no arquivo ABC123?"
-   → list_pages retorna: Mobile, Desktop, Design System
-
-2. "Me mostra os frames da página Mobile"
-   → list_frames retorna: Login, Home, Profile, Settings
-
-3. "Me dá os detalhes do frame Login"
-   → get_frame_info retorna: componentes, textos, cores
-
-4. "Captura um screenshot do Login"
-   → get_screenshot retorna: imagem base64
-
-5. "Extrai todos os assets do Login"
-   → extract_assets salva em icons/ e images/
-
-6. "Quais são os design tokens usados?"
-   → extract_styles retorna: cores, fontes, espaçamentos
-```
+---
 
 ## Rate Limiting
 
-O servidor gerencia automaticamente os rate limits da API do Figma:
+Figma's API has rate limits based on your plan. mcp-server-figma respects these limits and warns you when approaching them.
 
-| Tier | Endpoints | Limite |
-|------|-----------|--------|
-| 1 | GET files, images | 10 req/min |
-| 2 | GET styles | 25 req/min |
-| 3 | GET metadata | 50 req/min |
+| Plan | Rate Limit | Concurrent Requests |
+|------|-----------|-------------------|
+| Free | 120 requests/minute | 5 |
+| Professional | 240 requests/minute | 10 |
+| Organization | 480 requests/minute | 20 |
 
-- Implementa leaky bucket algorithm
-- Retry automático com backoff em caso de 429
-- Cache de requests para evitar chamadas duplicadas
+**What happens at limits?**
+- The server returns a clear error message
+- Suggestions for optimization (pagination, batching)
+- Automatic retry with exponential backoff for certain endpoints
 
-## Vantagens sobre MCPs tradicionais
+**Best practices:**
+- Use `continue=true` to paginate instead of fetching all at once
+- Combine multiple queries into single `get_frame_info()` calls
+- Cache results with `get_session_state()` before resetting
 
-| Problema | Solução |
-|----------|---------|
-| Overflow de contexto | Output JSON compacto e estruturado |
-| Precisa copiar IDs manualmente | Busca por nome com partial match |
-| Assets desorganizados | Separação automática icons/images |
-| Sem extração de estilos | Design tokens como JSON |
-| Screenshots muito grandes | Segmentação automática |
-| Estoura rate limit | Gerenciamento inteligente por tier |
-| Calls desnecessárias | Cache de requests |
+---
 
-## Licença
+## Troubleshooting
 
-MIT
+### "Invalid Figma API token"
+- Verify your token in Claude's configuration
+- Check that you copied the entire token (no extra spaces)
+- Regenerate the token in [Figma Settings](https://figma.com/settings) if needed
+
+### "File not found" or 404 errors
+- Ensure you have access to the file (shared or owned)
+- Use the full file URL or the 24-character file key
+- Check that the page/frame names are spelled exactly as they appear
+
+### "Rate limit exceeded"
+- Wait a few seconds and try again
+- Use `continue=true` for pagination
+- Check `get_session_state()` to see current request count
+
+### Large result sets are slow
+- Use pagination with `continue=true` instead of fetching everything at once
+- Reduce `depth` in `get_frame_info()` to explore less nesting
+- Use `search_components()` to narrow down results first
+
+---
+
+## API Reference
+
+All tools follow this naming convention:
+- **snake_case** for tool names
+- **snake_case** for parameters
+- Results include both human-readable names and technical IDs for flexibility
+
+For detailed type definitions and response schemas, see the [tools documentation](./src/tools/).
+
+---
+
+## License
+
+MIT — Feel free to use, modify, and distribute.
+
+---
+
+**Need help?** [Open an issue](https://github.com/alucardeht/mcp-server-figma/issues) or check the [Figma API docs](https://www.figma.com/developers/api).

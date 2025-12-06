@@ -1,18 +1,22 @@
 {
-  "name": "figma-mcp-server",
-  "version": "1.0.0",
-  "description": "MCP server for Figma with vision and asset extraction capabilities",
+  "name": "mcp-server-figma",
+  "version": "3.0.0",
+  "description": "MCP server for Figma API with intelligent context management, pagination, and token optimization",
   "type": "module",
   "main": "index.js",
   "bin": {
-    "figma-mcp": "./index.js"
+    "mcp-server-figma": "./index.js"
   },
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": ["mcp", "figma", "vision", "assets"],
-  "author": "",
+  "keywords": ["mcp", "figma", "model-context-protocol", "design", "api"],
+  "author": "alucardeht",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alucardeht/mcp-server-figma.git"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.5.0",
     "axios": "^1.6.2",
