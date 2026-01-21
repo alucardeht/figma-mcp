@@ -1,14 +1,17 @@
 export {
   checkLayoutBounds,
   compareElementPosition,
-  compareElementDimensions
+  compareElementDimensions,
+  validateLayout
 } from './layoutValidation.js';
 export { compareVisual } from './visualValidation.js';
 export {
   verifyElementsPresent,
-  verifyAssetsLoaded
+  verifyAssetsLoaded,
+  verifyImplementationConsolidated
 } from './assetValidation.js';
 export {
   validateResponsiveBreakpoint,
   testAllBreakpoints
 } from './responsiveValidation.js';
+export { validateImplementation } from './validateImplementation.js';

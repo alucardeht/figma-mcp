@@ -102,10 +102,11 @@ export function analyzeFrame(node, depth, currentDepth = 0) {
     };
   }
 
-  if (currentDepth < depth && node.children?.length > 0) {
-    result.children = node.children.map((child) => analyzeFrame(child, depth, currentDepth + 1));
-  } else if (node.children?.length > 0) {
-    result.childCount = node.children.length;
+  const children = node.children || [];
+  if (currentDepth < depth && children.length > 0) {
+    result.children = children.map((child) => analyzeFrame(child, depth, currentDepth + 1));
+  } else if (children.length > 0) {
+    result.childCount = children.length;
   }
 
   return result;

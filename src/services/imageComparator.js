@@ -21,11 +21,11 @@ export async function compareImages(image1Buffer, image2Buffer, options = {}) {
       return {
         success: false,
         error: "DIMENSION_MISMATCH",
+        message: `Images have different dimensions: ${w1}x${h1} vs ${w2}x${h2}. Resize browser to match Figma viewport exactly.`,
         details: {
-          image1: { width: w1, height: h1 },
-          image2: { width: w2, height: h2 }
-        },
-        message: `Images have different dimensions: ${w1}x${h1} vs ${w2}x${h2}. Resize browser to match Figma viewport exactly.`
+          figmaDimensions: { width: w1, height: h1 },
+          browserDimensions: { width: w2, height: h2 }
+        }
       };
     }
 
@@ -51,6 +51,14 @@ export async function compareImages(image1Buffer, image2Buffer, options = {}) {
     const matchScore = ((totalPixels - mismatchedPixels) / totalPixels) * 100;
     const regions = analyzeProblematicRegions(diffBuffer, width, height);
 
+    let diffImageBase64 = null;
+    if (options.includeDiffImage !== false) {
+      const diffPng = await sharp(diffBuffer, {
+        raw: { width, height, channels: 4 }
+      }).png().toBuffer();
+      diffImageBase64 = diffPng.toString('base64');
+    }
+
     return {
       success: true,
       matchScore: parseFloat(matchScore.toFixed(1)),
@@ -58,7 +66,8 @@ export async function compareImages(image1Buffer, image2Buffer, options = {}) {
       totalPixels,
       dimensions: { width, height },
       regions,
-      threshold
+      threshold,
+      diffImageBase64
     };
   } catch (error) {
     return {

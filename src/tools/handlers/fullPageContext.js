@@ -138,7 +138,7 @@ function extractSectionAssets(sectionNodes, fileKey, sectionName, sectionId) {
     }
 
     if (node.children && !isIconNode(node) && !isImageNode(node)) {
-      for (const child of node.children) {
+      for (const child of node.children || []) {
         traverse(child, currentPath);
       }
     }
@@ -334,6 +334,31 @@ function buildAgentInstructions(section, agentIndex, totalAgents, assets, styles
   return instructions;
 }
 
+function countAssetsOnly(nodes) {
+  let icons = 0;
+  let images = 0;
+
+  function traverse(node) {
+    if (isIconNode(node)) {
+      icons++;
+    } else if (isImageNode(node)) {
+      images++;
+    }
+
+    if (node.children && !isIconNode(node) && !isImageNode(node)) {
+      for (const child of node.children || []) {
+        traverse(child);
+      }
+    }
+  }
+
+  for (const node of nodes) {
+    traverse(node);
+  }
+
+  return { icons, images };
+}
+
 function countTotalAssets(sections) {
   let icons = 0;
   let images = 0;
@@ -370,7 +395,19 @@ function buildAssetMap(sections) {
   return assetMap;
 }
 
-export async function getFullPageContext(ctx, fileKey, pageName, frameName, scale = 2) {
+export async function getFullPageContext(ctx, args) {
+  const {
+    file_key: fileKey,
+    page_name: pageName,
+    frame_name: frameName,
+    scale = 2,
+    include_screenshots = false,
+    include_assets = false,
+    include_styles = true,
+    include_agent_instructions = false,
+    include_asset_map = false,
+  } = args;
+
   const { session, chunker, figmaClient } = ctx;
 
   session.setCurrentFile(fileKey);
@@ -378,7 +415,7 @@ export async function getFullPageContext(ctx, fileKey, pageName, frameName, scal
   const page = figmaClient.findPageByName(file, pageName);
 
   if (!page) {
-    const available = file.document.children.map((p) => p.name).join(", ");
+    const available = (file.document.children || []).map((p) => p.name).join(", ");
     throw new Error(`Page "${pageName}" not found. Available: ${available}`);
   }
 
@@ -396,7 +433,10 @@ export async function getFullPageContext(ctx, fileKey, pageName, frameName, scal
 
   const sectionGroups = groupNodesBySection(frameChildren);
 
-  const frameImageBuffer = await captureFullFrameImage(ctx, fileKey, frame, scale);
+  let frameImageBuffer = null;
+  if (include_screenshots) {
+    frameImageBuffer = await captureFullFrameImage(ctx, fileKey, frame, scale);
+  }
 
   const sections = [];
 
@@ -412,32 +452,41 @@ export async function getFullPageContext(ctx, fileKey, pageName, frameName, scal
       height: sectionGroup.maxY - sectionGroup.minY,
     };
 
-    const { icons, images } = extractSectionAssets(
-      sectionGroup.nodes,
-      fileKey,
-      sectionName,
-      `section-${idx}`
-    );
-
     const sectionNodes = [];
     for (const node of sectionGroup.nodes) {
       const collectNodes = (n) => {
         sectionNodes.push(n);
-        if (n.children) {
-          n.children.forEach(collectNodes);
+        const children = n.children || [];
+        if (children.length > 0) {
+          children.forEach(collectNodes);
         }
       };
       collectNodes(node);
     }
 
-    const styles = extractSectionStyles(sectionNodes);
+    let assets = null;
+    let assetCount = null;
+
+    if (include_assets) {
+      assets = extractSectionAssets(
+        sectionGroup.nodes,
+        fileKey,
+        sectionName,
+        `section-${idx}`
+      );
+    } else {
+      assetCount = countAssetsOnly(sectionGroup.nodes);
+    }
+
+    const styles = include_styles ? extractSectionStyles(sectionNodes) : null;
     const mainElements = extractMainElements(sectionGroup.nodes);
 
-    const screenshot = frameImageBuffer
-      ? await extractSectionScreenshot(frameImageBuffer, sectionBounds, scale)
-      : null;
+    let screenshot = null;
+    if (include_screenshots && frameImageBuffer) {
+      screenshot = await extractSectionScreenshot(frameImageBuffer, sectionBounds, scale);
+    }
 
-    sections.push({
+    const section = {
       id: `section-${idx}`,
       name: sectionName,
       bgColor: sectionGroup.bgColor || "#FFFFFF",
@@ -447,25 +496,38 @@ export async function getFullPageContext(ctx, fileKey, pageName, frameName, scal
         width: Math.round(sectionBounds.width),
         height: Math.round(sectionBounds.height),
       },
-      screenshot: screenshot,
-      assets: {
-        icons,
-        images,
-      },
-      styles,
       mainElements,
-    });
+    };
+
+    if (include_styles) {
+      section.styles = styles;
+    }
+
+    if (include_assets) {
+      section.assets = assets;
+    } else {
+      section.assetCount = assetCount;
+    }
+
+    if (include_screenshots) {
+      section.screenshot = screenshot;
+    }
+
+    sections.push(section);
   }
 
-  const totalAssets = countTotalAssets(sections);
+  let totalAssets = { icons: 0, images: 0 };
+  if (include_assets) {
+    totalAssets = countTotalAssets(sections);
+  } else {
+    for (const section of sections) {
+      totalAssets.icons += section.assetCount.icons;
+      totalAssets.images += section.assetCount.images;
+    }
+  }
+
   const transitionElements = findTransitionElements(sectionGroups, frameChildren);
-  const assetMap = buildAssetMap(sections);
-
   const recommendedAgentCount = Math.max(1, Math.min(sections.length, Math.ceil(sections.length / 2)));
-
-  const agentInstructions = sections.map((section, idx) =>
-    buildAgentInstructions(section, idx, sections.length, section.assets, section.styles)
-  );
 
   const overview = {
     frameName: frame.name,
@@ -482,16 +544,24 @@ export async function getFullPageContext(ctx, fileKey, pageName, frameName, scal
   const result = {
     overview,
     sections,
-    assetMap,
-    agentInstructions,
     transitionElements,
   };
+
+  if (include_assets && include_asset_map) {
+    result.assetMap = buildAssetMap(sections);
+  }
+
+  if (include_agent_instructions) {
+    result.agentInstructions = sections.map((section, idx) =>
+      buildAgentInstructions(section, idx, sections.length, section.assets || { icons: [], images: [] }, section.styles || {})
+    );
+  }
 
   const response = chunker.wrapResponse(result, {
     step: "Full page context prepared",
     progress: `${sections.length} sections, ${totalAssets.icons} icons, ${totalAssets.images} images`,
     nextStep: `Distribute to ${recommendedAgentCount} agent${recommendedAgentCount > 1 ? "s" : ""} for parallel implementation`,
-    strategy: `Each agent has complete section context including screenshots, assets, and design tokens`,
+    strategy: `Lazy-loaded context: screenshots=${include_screenshots}, assets=${include_assets}, styles=${include_styles}, instructions=${include_agent_instructions}`,
   });
 
   return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };

@@ -237,7 +237,7 @@ export function frameToCompact(node, options = {}) {
 
   const lines = [headerLine];
 
-  if (node.children && node.children.length > 0) {
+  if ((node.children && node.children.length > 0)) {
     const nodeBounds = getNodeBounds(node, parentBounds);
     const treeLines = buildTree(node, '', nodeBounds, 0, maxDepth, maxChildrenShown);
     lines.push(...treeLines);

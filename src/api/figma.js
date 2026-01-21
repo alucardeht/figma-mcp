@@ -9,6 +9,24 @@ const TIER_LIMITS = {
   3: { requests: 50, window: 60000 },
 };
 
+function filterInvisible(node) {
+  if (!node) return null;
+
+  if (node.visible === false) return null;
+
+  if (!node.children) return node;
+
+  const filteredChildren = node.children
+    .filter(child => child.visible !== false)
+    .map(child => filterInvisible(child))
+    .filter(child => child !== null);
+
+  return {
+    ...node,
+    children: filteredChildren
+  };
+}
+
 class FigmaClient {
   constructor(token) {
     this.token = token;
@@ -42,12 +60,17 @@ class FigmaClient {
   }
 
   async getFile(fileKey, depth = 1) {
-    return await this.request(`/files/${fileKey}`, { depth }, 1);
+    const response = await this.request(`/files/${fileKey}`, { depth }, 1);
+    if (response.document) {
+      response.document = filterInvisible(response.document);
+    }
+    return response;
   }
 
   async getNode(fileKey, nodeId) {
     const data = await this.request(`/files/${fileKey}/nodes`, { ids: nodeId }, 1);
-    return data.nodes[nodeId]?.document;
+    const node = data.nodes[nodeId]?.document;
+    return filterInvisible(node);
   }
 
   async getNodeById(fileKey, nodeId) {
@@ -56,7 +79,9 @@ class FigmaClient {
   }
 
   async getImage(fileKey, nodeIds, format = "png", scale = 2) {
-    const ids = Array.isArray(nodeIds) ? nodeIds.join(",") : nodeIds;
+    const ids = Array.isArray(nodeIds)
+      ? nodeIds.map(convertNodeIdToApiFormat).join(",")
+      : convertNodeIdToApiFormat(nodeIds);
     return await this.request(`/images/${fileKey}`, { ids, format, scale }, 1);
   }
 

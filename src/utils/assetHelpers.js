@@ -1,3 +1,4 @@
+
 export function isIconNode(node) {
   const name = node.name.toLowerCase();
   const hasIconKeyword =
@@ -48,15 +49,14 @@ export function isCompositeGroup(node) {
     if (['RECTANGLE', 'ELLIPSE', 'VECTOR', 'POLYGON', 'STAR', 'LINE'].includes(n.type)) {
       if (!hasImageFill(n)) count++;
     }
-    if (n.children) {
-      for (const child of n.children) {
-        count += countShapesRecursive(child);
-      }
+    const children = n.children || [];
+    for (const child of children) {
+      count += countShapesRecursive(child);
     }
     return count;
   }
 
-  for (const child of node.children) {
+  for (const child of (node.children || [])) {
     if (hasImageFill(child)) {
       hasMainImage = true;
     }
@@ -269,7 +269,7 @@ export function findAssets(node, options = {}) {
   }
 
   if (node.children && !isIcon && !isImage && !isComposite) {
-    node.children.forEach((child) => {
+    (node.children || []).forEach((child) => {
       assets.push(
         ...findAssets(child, {
           path: currentPath,

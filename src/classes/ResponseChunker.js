@@ -8,37 +8,17 @@ class ResponseChunker {
 
   wrapResponse(data, options = {}) {
     const {
-      step = "Operation completed",
-      progress = "1/1",
-      nextStep = null,
+      progress = null,
       canContinue = false,
-      guidance = null,
-      progressInfo = null,
     } = options;
 
-    const response = {
-      _navigation: {
-        currentStep: step,
-        progress,
-        tokensThisResponse: 0,
-        canContinue,
-      },
-      data,
-    };
+    const response = { data };
 
-    if (nextStep) {
-      response._navigation.nextStep = nextStep;
+    if (progress || canContinue) {
+      response._navigation = {};
+      if (progress) response._navigation.progress = progress;
+      if (canContinue) response._navigation.canContinue = true;
     }
-
-    if (guidance) {
-      response._guidance = guidance;
-    }
-
-    if (progressInfo) {
-      response._progress = progressInfo;
-    }
-
-    response._navigation.tokensThisResponse = this.tokenEstimator.estimate(response);
 
     this.session.storeLastResponse(response);
 

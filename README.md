@@ -69,6 +69,19 @@ Landing page [1440x2462 bg:#f2f2f2]
 - **Partial matching**: "Landing" matches "Landing page"
 - **Session state**: Maintains context across requests
 
+### Invisible Element Filtering
+
+By default, elements with `visible: false` in Figma are excluded from all MCP outputs:
+
+- **Frame structure** (`get_frame_info`) - Only visible elements in the tree
+- **Asset extraction** (`extract_assets`) - Only visible icons and images
+- **Style collection** (`extract_styles`) - Only styles from visible elements
+- **Page analysis** (`analyze_page_structure`) - Only visible sections and components
+
+This ensures the MCP output matches what you actually see in Figma's design view, not hidden elements used for design iteration, disabled variants, or placeholder components.
+
+**Why this matters:** Designers often hide elements (placeholders, alternative versions, work in progress). Without filtering, the AI model would see and potentially implement these invisible elements, causing divergence from the intended design.
+
 ### Asset Management
 - **Organized extraction**: Assets saved to `icons/` and `images/` folders
 - **Design tokens**: Extract colors, typography, effects

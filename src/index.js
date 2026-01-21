@@ -84,13 +84,7 @@ class FigmaMCPServer {
             );
             break;
           case "get_full_page_context":
-            result = await handlers.getFullPageContext(
-              this.ctx,
-              args.file_key,
-              args.page_name,
-              args.frame_name,
-              args.scale || 2
-            );
+            result = await handlers.getFullPageContext(this.ctx, args);
             break;
           case "check_layout_bounds":
             result = await handlers.checkLayoutBounds(this.ctx, args);
@@ -101,6 +95,9 @@ class FigmaMCPServer {
           case "compare_element_dimensions":
             result = await handlers.compareElementDimensions(this.ctx, args);
             break;
+          case "validate_layout":
+            result = await handlers.validateLayout(this.ctx, args);
+            break;
           case "compare_visual":
             result = await handlers.compareVisual(this.ctx, args);
             break;
@@ -110,11 +107,17 @@ class FigmaMCPServer {
           case "verify_assets_loaded":
             result = await handlers.verifyAssetsLoaded(this.ctx, args);
             break;
+          case "verify_implementation_v2":
+            result = await handlers.verifyImplementationConsolidated(this.ctx, args);
+            break;
           case "validate_responsive_breakpoint":
             result = await handlers.validateResponsiveBreakpoint(this.ctx, args);
             break;
           case "test_all_breakpoints":
             result = await handlers.testAllBreakpoints(this.ctx, args);
+            break;
+          case "validate_implementation":
+            result = await handlers.validateImplementation(this.ctx, args);
             break;
           case "repeat_last":
             result = handlers.repeatLast(this.ctx);

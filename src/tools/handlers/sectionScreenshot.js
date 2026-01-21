@@ -107,7 +107,8 @@ export async function getSectionScreenshot(
 }
 
 function calculateSections(frame) {
-  if (!frame.children || frame.children.length === 0) {
+  const children = frame.children || [];
+  if (!children || children.length === 0) {
     return [
       {
         id: "section-0",
@@ -123,7 +124,7 @@ function calculateSections(frame) {
   let currentSection = null;
   let sectionIndex = 0;
 
-  const sortedChildren = [...frame.children].sort(
+  const sortedChildren = [...children].sort(
     (a, b) => (a.absoluteBoundingBox?.y || 0) - (b.absoluteBoundingBox?.y || 0)
   );
 

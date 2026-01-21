@@ -292,3 +292,24 @@ function evaluateIconStatus(info) {
 
   return { status: 'unknown', issue: 'Could not determine icon status' };
 }
+
+export async function verifyImplementationConsolidated(ctx, args) {
+  const { verification_type, ...rest } = args;
+
+  switch (verification_type) {
+    case "elements":
+      return verifyElementsPresent(ctx, rest);
+    case "assets":
+      return verifyAssetsLoaded(ctx, rest);
+    default:
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "ERROR",
+            error: `Unknown verification_type: ${verification_type}. Use 'elements' or 'assets'.`
+          }, null, 2)
+        }]
+      };
+  }
+}

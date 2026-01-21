@@ -8,4 +8,4 @@ export { repeatLast, getSessionState, resetSession } from "./session.js";
 export { analyzePageStructure } from "./pageStructure.js";
 export { getAgentContext } from "./agentContext.js";
 export { getFullPageContext } from "./fullPageContext.js";
-export { checkLayoutBounds, compareElementPosition, compareElementDimensions, compareVisual, verifyElementsPresent, verifyAssetsLoaded, validateResponsiveBreakpoint, testAllBreakpoints } from "./validation/index.js";
+export { checkLayoutBounds, compareElementPosition, compareElementDimensions, validateLayout, compareVisual, verifyElementsPresent, verifyAssetsLoaded, verifyImplementationConsolidated, validateResponsiveBreakpoint, testAllBreakpoints, validateImplementation } from "./validation/index.js";

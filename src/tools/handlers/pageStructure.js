@@ -133,10 +133,9 @@ function extractIconsAndImages(section, sectionId) {
       });
     }
 
-    if (node.children) {
-      for (const child of node.children) {
-        traverse(child);
-      }
+    const visibleChildren = node.children || [];
+    for (const child of visibleChildren) {
+      traverse(child);
     }
   }
 

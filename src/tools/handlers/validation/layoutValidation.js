@@ -219,3 +219,26 @@ export async function compareElementDimensions(ctx, args) {
     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
   };
 }
+
+export async function validateLayout(ctx, args) {
+  const { validation_type, ...rest } = args;
+
+  switch (validation_type) {
+    case "overflow":
+      return checkLayoutBounds(ctx, rest);
+    case "position":
+      return compareElementPosition(ctx, rest);
+    case "dimensions":
+      return compareElementDimensions(ctx, rest);
+    default:
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "ERROR",
+            error: `Unknown validation_type: ${validation_type}. Use 'overflow', 'position', or 'dimensions'.`
+          }, null, 2)
+        }]
+      };
+  }
+}

@@ -231,9 +231,7 @@ export async function getAgentContext(
     const collectNodeIds = (n) => {
       sectionNodeIds.add(n.id);
       sectionNodes.push(n);
-      if (n.children) {
-        n.children.forEach(collectNodeIds);
-      }
+      (n.children || []).forEach(collectNodeIds);
     };
     collectNodeIds(node);
   }
