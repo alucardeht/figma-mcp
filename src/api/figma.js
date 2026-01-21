@@ -1,5 +1,6 @@
 import axios from "axios";
 import RateLimiter from "../classes/RateLimiter.js";
+import { convertNodeIdToApiFormat } from "../utils/nodeId.js";
 
 const FIGMA_API_BASE = "https://api.figma.com/v1";
 const TIER_LIMITS = {
@@ -47,6 +48,11 @@ class FigmaClient {
   async getNode(fileKey, nodeId) {
     const data = await this.request(`/files/${fileKey}/nodes`, { ids: nodeId }, 1);
     return data.nodes[nodeId]?.document;
+  }
+
+  async getNodeById(fileKey, nodeId) {
+    const apiNodeId = convertNodeIdToApiFormat(nodeId);
+    return await this.getNode(fileKey, apiNodeId);
   }
 
   async getImage(fileKey, nodeIds, format = "png", scale = 2) {

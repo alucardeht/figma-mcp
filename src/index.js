@@ -49,10 +49,10 @@ class FigmaMCPServer {
             result = await handlers.listFrames(this.ctx, args.file_key, args.page_name, args.continue);
             break;
           case "get_frame_info":
-            result = await handlers.getFrameInfo(this.ctx, args.file_key, args.page_name, args.frame_name, args.depth || 2, args.continue);
+            result = await handlers.getFrameInfo(this.ctx, args.file_key, args.page_name, args.frame_name, args.depth || 2, args.continue, args.node_id);
             break;
           case "get_screenshot":
-            result = await handlers.getScreenshot(this.ctx, args.file_key, args.page_name, args.frame_name, args.scale || 2, args.max_dimension || 4096);
+            result = await handlers.getScreenshot(this.ctx, args.file_key, args.page_name, args.frame_name, args.scale || 2, args.max_dimension || 4096, args.node_id);
             break;
           case "extract_styles":
             result = await handlers.extractStyles(this.ctx, args.file_key, args.page_name, args.frame_name);
@@ -91,6 +91,30 @@ class FigmaMCPServer {
               args.frame_name,
               args.scale || 2
             );
+            break;
+          case "check_layout_bounds":
+            result = await handlers.checkLayoutBounds(this.ctx, args);
+            break;
+          case "compare_element_position":
+            result = await handlers.compareElementPosition(this.ctx, args);
+            break;
+          case "compare_element_dimensions":
+            result = await handlers.compareElementDimensions(this.ctx, args);
+            break;
+          case "compare_visual":
+            result = await handlers.compareVisual(this.ctx, args);
+            break;
+          case "verify_elements_present":
+            result = await handlers.verifyElementsPresent(this.ctx, args);
+            break;
+          case "verify_assets_loaded":
+            result = await handlers.verifyAssetsLoaded(this.ctx, args);
+            break;
+          case "validate_responsive_breakpoint":
+            result = await handlers.validateResponsiveBreakpoint(this.ctx, args);
+            break;
+          case "test_all_breakpoints":
+            result = await handlers.testAllBreakpoints(this.ctx, args);
             break;
           case "repeat_last":
             result = handlers.repeatLast(this.ctx);

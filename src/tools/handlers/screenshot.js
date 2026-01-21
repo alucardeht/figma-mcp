@@ -1,22 +1,42 @@
 import axios from "axios";
 import sharp from "sharp";
+import { convertNodeIdToApiFormat } from "../../utils/nodeId.js";
 
-export async function getScreenshot(ctx, fileKey, pageName, frameName, scale, maxDimension) {
-  const { chunker, figmaClient } = ctx;
+export async function getScreenshot(ctx, fileKey, pageName, frameName, scale, maxDimension, nodeId = null) {
+  const { chunker, figmaClient, session } = ctx;
 
-  const file = await figmaClient.getFile(fileKey, 2);
-  const page = figmaClient.findPageByName(file, pageName);
-  if (!page) throw new Error(`Page "${pageName}" not found`);
+  if (!nodeId && (!pageName || !frameName)) {
+    throw new Error("Must provide either node_id OR both page_name and frame_name");
+  }
 
-  const frame = figmaClient.findFrameByName(page, frameName);
-  if (!frame) throw new Error(`Frame "${frameName}" not found`);
+  let frameId;
+  let frameNodeData;
+  let frameName_;
 
-  const width = (frame.absoluteBoundingBox?.width || 0) * scale;
-  const height = (frame.absoluteBoundingBox?.height || 0) * scale;
+  if (nodeId) {
+    const apiNodeId = convertNodeIdToApiFormat(nodeId);
+    frameId = apiNodeId;
+    frameNodeData = await figmaClient.getNodeById(fileKey, nodeId);
+    frameName_ = frameNodeData?.name || nodeId;
+  } else {
+    const file = await figmaClient.getFile(fileKey, 2);
+    const page = figmaClient.findPageByName(file, pageName);
+    if (!page) throw new Error(`Page "${pageName}" not found`);
 
-  const imageData = await figmaClient.getImage(fileKey, frame.id, "png", scale);
+    const frame = figmaClient.findFrameByName(page, frameName);
+    if (!frame) throw new Error(`Frame "${frameName}" not found`);
 
-  const imageUrl = imageData.images[frame.id];
+    frameId = frame.id;
+    frameNodeData = frame;
+    frameName_ = frame.name;
+  }
+
+  const width = (frameNodeData.absoluteBoundingBox?.width || 0) * scale;
+  const height = (frameNodeData.absoluteBoundingBox?.height || 0) * scale;
+
+  const imageData = await figmaClient.getImage(fileKey, frameId, "png", scale);
+
+  const imageUrl = imageData.images[frameId];
   if (!imageUrl) throw new Error("Failed to generate image");
 
   const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
@@ -29,7 +49,7 @@ export async function getScreenshot(ctx, fileKey, pageName, frameName, scale, ma
     });
 
     const navInfo = chunker.wrapResponse(
-      { frame: frame.name, width: Math.round(width), height: Math.round(height), tiles: tiles.length },
+      { frame: frameName_, width: Math.round(width), height: Math.round(height), tiles: tiles.length },
       {
         step: `Screenshot segmented into ${tiles.length} tiles`,
         progress: "Complete",
@@ -50,7 +70,7 @@ export async function getScreenshot(ctx, fileKey, pageName, frameName, scale, ma
   }
 
   const navInfo = chunker.wrapResponse(
-    { frame: frame.name, width: Math.round(width), height: Math.round(height) },
+    { frame: frameName_, width: Math.round(width), height: Math.round(height) },
     {
       step: "Screenshot captured",
       progress: "Complete",

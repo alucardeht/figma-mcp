@@ -128,39 +128,77 @@ export async function listFrames(ctx, fileKey, pageName, continueFlag = false) {
   return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
 }
 
-export async function getFrameInfo(ctx, fileKey, pageName, frameName, depth, continueFlag = false) {
+export async function getFrameInfo(ctx, fileKey, pageName, frameName, depth, continueFlag = false, nodeId = null) {
   const { session, chunker, figmaClient } = ctx;
-  const operationId = `get_frame_info:${fileKey}:${pageName}:${frameName}`;
 
-  if (continueFlag && session.hasPendingChunks(operationId)) {
-    const chunk = session.getNextChunk(operationId);
-    const response = chunker.wrapResponse(
-      { children: chunk.items },
-      {
-        step: `Showing children ${(chunk.chunkIndex - 1) * 20 + 1}-${Math.min(chunk.chunkIndex * 20, chunk.totalItems)}`,
-        progress: `${chunk.chunkIndex}/${chunk.totalChunks}`,
-        nextStep: chunk.chunkIndex < chunk.totalChunks ? "Call with continue=true for more" : "Use extract_styles or extract_assets",
-        operationId,
-      }
-    );
-    return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+  if (!nodeId && (!pageName || !frameName)) {
+    throw new Error("Must provide either node_id OR both page_name and frame_name");
   }
 
-  session.setCurrentFile(fileKey);
-  const file = await figmaClient.getFile(fileKey, 2);
-  const page = figmaClient.findPageByName(file, pageName);
-  if (!page) throw new Error(`Page "${pageName}" not found`);
+  let frame;
+  let operationId;
 
-  const frameRef = figmaClient.findFrameByName(page, frameName);
-  if (!frameRef) {
-    const available = (page.children || [])
-      .filter((c) => c.type === "FRAME" || c.type === "COMPONENT")
-      .map((f) => f.name)
-      .join(", ");
-    throw new Error(`Frame "${frameName}" not found. Available: ${available}`);
+  if (nodeId) {
+    operationId = `get_frame_info:${fileKey}:${nodeId}`;
+
+    if (continueFlag && session.hasPendingChunks(operationId)) {
+      const chunk = session.getNextChunk(operationId);
+      const response = chunker.wrapResponse(
+        { children: chunk.items },
+        {
+          step: `Showing children ${(chunk.chunkIndex - 1) * 20 + 1}-${Math.min(chunk.chunkIndex * 20, chunk.totalItems)}`,
+          progress: `${chunk.chunkIndex}/${chunk.totalChunks}`,
+          nextStep: chunk.chunkIndex < chunk.totalChunks ? "Call with continue=true for more" : "Use extract_styles or extract_assets",
+          operationId,
+        }
+      );
+      return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+    }
+
+    session.setCurrentFile(fileKey);
+    const cachedFrame = session.getFrameInfoByNodeId(fileKey, nodeId);
+    if (cachedFrame) {
+      frame = cachedFrame;
+    } else {
+      frame = await figmaClient.getNodeById(fileKey, nodeId);
+      session.cacheFrameInfoByNodeId(fileKey, nodeId, frame);
+    }
+
+    if (!frame) throw new Error(`Node "${nodeId}" not found or not accessible`);
+  } else {
+    operationId = `get_frame_info:${fileKey}:${pageName}:${frameName}`;
+
+    if (continueFlag && session.hasPendingChunks(operationId)) {
+      const chunk = session.getNextChunk(operationId);
+      const response = chunker.wrapResponse(
+        { children: chunk.items },
+        {
+          step: `Showing children ${(chunk.chunkIndex - 1) * 20 + 1}-${Math.min(chunk.chunkIndex * 20, chunk.totalItems)}`,
+          progress: `${chunk.chunkIndex}/${chunk.totalChunks}`,
+          nextStep: chunk.chunkIndex < chunk.totalChunks ? "Call with continue=true for more" : "Use extract_styles or extract_assets",
+          operationId,
+        }
+      );
+      return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+    }
+
+    session.setCurrentFile(fileKey);
+    const file = await figmaClient.getFile(fileKey, 2);
+    const page = figmaClient.findPageByName(file, pageName);
+    if (!page) throw new Error(`Page "${pageName}" not found`);
+
+    const frameRef = figmaClient.findFrameByName(page, frameName);
+    if (!frameRef) {
+      const available = (page.children || [])
+        .filter((c) => c.type === "FRAME" || c.type === "COMPONENT")
+        .map((f) => f.name)
+        .join(", ");
+      throw new Error(`Frame "${frameName}" not found. Available: ${available}`);
+    }
+
+    frame = await figmaClient.getNode(fileKey, frameRef.id);
   }
 
-  const frame = await figmaClient.getNode(fileKey, frameRef.id);
   const childCount = countElements(frame);
   const { tokenEstimator } = ctx;
 

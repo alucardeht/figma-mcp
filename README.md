@@ -85,6 +85,7 @@ Landing page [1440x2462 bg:#f2f2f2]
 | `list_pages(file_key)` | List all pages in a file |
 | `list_frames(file_key, page_name)` | List frames on a page |
 | `get_frame_info(file_key, page_name, frame_name, depth?)` | Get frame structure in compact format |
+| `get_frame_info(file_key, node_id?, depth?)` | Get frame via node_id (faster direct access) |
 | `search_components(file_key, query)` | Find components by name |
 
 ### Extraction
@@ -92,9 +93,23 @@ Landing page [1440x2462 bg:#f2f2f2]
 | Tool | Description |
 |------|-------------|
 | `get_screenshot(file_key, page_name, frame_name)` | Export frame as PNG |
+| `get_screenshot(file_key, node_id?)` | Export frame via node_id (faster direct access) |
 | `extract_styles(file_key, page_name, frame_name)` | Extract design tokens |
 | `extract_assets(file_key, page_name, frame_name)` | Export SVGs and images |
 | `get_file_styles(file_key)` | List published styles |
+
+### Validation
+
+| Tool | Description |
+|------|-------------|
+| `check_layout_bounds(file_key, page_name, frame_name)` | Detect content overflow |
+| `compare_element_position(file_key, page_name, frame_name, element_name, browser_x, browser_y)` | Compare position: Figma vs browser |
+| `compare_element_dimensions(file_key, page_name, frame_name, element_name, browser_width, browser_height)` | Compare dimensions: Figma vs browser |
+| `compare_visual(file_key, page_name, frame_name, screenshot_path)` | Pixel-perfect diff with pixelmatch |
+| `verify_elements_present(file_key, page_name, frame_name, element_names)` | Check elements exist in DOM |
+| `verify_assets_loaded(file_key, page_name, frame_name)` | Verify images are loaded |
+| `validate_responsive_breakpoint(file_key, page_name, frame_name, viewport_width)` | Validate specific viewport |
+| `test_all_breakpoints(file_key, page_name, frame_name)` | Test mobile, tablet, desktop |
 
 ### Session
 
@@ -103,6 +118,28 @@ Landing page [1440x2462 bg:#f2f2f2]
 | `repeat_last()` | Replay previous response from cache |
 | `get_session_state()` | View current session state |
 | `reset_session()` | Clear all cached data |
+
+---
+
+## Direct Access via Node ID
+
+Both `get_frame_info` and `get_screenshot` accept `node_id` as an alternative to `page_name + frame_name` for faster, direct access.
+
+**How to get node_id:**
+1. Open frame in Figma editor
+2. Copy the ID from the URL: `https://www.figma.com/design/FILE_KEY/...?node-id=NODE_ID`
+3. Node ID format example: `40000056-28165`
+
+**Usage:**
+```bash
+get_frame_info(file_key="h75vgHNcwxfHkRBbI53RRu", node_id="40000056-28165", depth=4)
+get_screenshot(file_key="h75vgHNcwxfHkRBbI53RRu", node_id="40000056-28165")
+```
+
+**Benefits:**
+- Skips page/frame name lookup (1 fewer API call)
+- More direct and reliable
+- Useful for specific design reviews
 
 ---
 

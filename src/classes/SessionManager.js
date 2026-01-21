@@ -85,6 +85,21 @@ class SessionManager {
     this.lastUpdated = Date.now();
   }
 
+  getFrameInfoByNodeId(fileKey, nodeId) {
+    const cacheKey = `nodeId:${fileKey}:${nodeId}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    return null;
+  }
+
+  cacheFrameInfoByNodeId(fileKey, nodeId, frameInfo) {
+    const cacheKey = `nodeId:${fileKey}:${nodeId}`;
+    this.cache.set(cacheKey, frameInfo);
+    this.lastUpdated = Date.now();
+  }
+
   getState() {
     return {
       currentFile: this.currentFile,
