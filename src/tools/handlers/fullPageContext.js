@@ -438,6 +438,7 @@ export async function getFullPageContext(ctx, args) {
     frameImageBuffer = await captureFullFrameImage(ctx, fileKey, frame, scale);
   }
 
+  const frameOffsetY = frame.absoluteBoundingBox?.y || 0;
   const sections = [];
 
   for (let idx = 0; idx < sectionGroups.length; idx++) {
@@ -446,10 +447,10 @@ export async function getFullPageContext(ctx, args) {
     const sectionName = inferSectionName(firstNode.name) || `Section ${idx + 1}`;
 
     const sectionBounds = {
-      x: sectionGroup.minY,
-      y: sectionGroup.minY,
+      x: 0,
+      y: Math.round(sectionGroup.minY - frameOffsetY),
       width: frame.absoluteBoundingBox?.width || 0,
-      height: sectionGroup.maxY - sectionGroup.minY,
+      height: Math.round(sectionGroup.maxY - sectionGroup.minY),
     };
 
     const sectionNodes = [];

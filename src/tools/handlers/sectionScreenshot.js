@@ -108,12 +108,14 @@ export async function getSectionScreenshot(
 
 function calculateSections(frame) {
   const children = frame.children || [];
+  const frameOffsetY = frame.absoluteBoundingBox?.y || 0;
+
   if (!children || children.length === 0) {
     return [
       {
         id: "section-0",
         name: frame.name,
-        bounds: frame.absoluteBoundingBox || { x: 0, y: 0, width: 0, height: 0 },
+        bounds: { x: 0, y: 0, width: frame.absoluteBoundingBox?.width || 0, height: frame.absoluteBoundingBox?.height || 0 },
         backgroundColor: extractBackgroundColor(frame),
         childCount: 0,
       },
@@ -142,8 +144,8 @@ function calculateSections(frame) {
         id: `section-${sectionIndex}`,
         name: child.name,
         bounds: {
-          x: child.absoluteBoundingBox.x,
-          y: child.absoluteBoundingBox.y,
+          x: 0,
+          y: Math.round(child.absoluteBoundingBox.y - frameOffsetY),
           width: child.absoluteBoundingBox.width,
           height: child.absoluteBoundingBox.height,
         },
@@ -161,7 +163,7 @@ function calculateSections(frame) {
 
       currentSection.bounds.height = Math.max(
         currentSection.bounds.height,
-        childBottom - currentSection.bounds.y
+        childBottom - frameOffsetY - currentSection.bounds.y
       );
     }
   }
@@ -176,7 +178,7 @@ function calculateSections(frame) {
         {
           id: "section-0",
           name: frame.name,
-          bounds: frame.absoluteBoundingBox || { x: 0, y: 0, width: 0, height: 0 },
+          bounds: { x: 0, y: 0, width: frame.absoluteBoundingBox?.width || 0, height: frame.absoluteBoundingBox?.height || 0 },
           backgroundColor: extractBackgroundColor(frame),
           childCount: frame.children.length,
         },

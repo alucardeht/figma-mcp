@@ -203,6 +203,7 @@ export async function getAgentContext(
   const frame = await figmaClient.getNode(fileKey, frameRef.id);
 
   const sectionGroups = groupNodesBySection(frame.children || []);
+  const frameOffsetY = frame.absoluteBoundingBox?.y || 0;
 
   const sectionIndex = parseInt(sectionId.split("-")[1], 10);
   if (sectionIndex < 0 || sectionIndex >= sectionGroups.length) {
@@ -217,8 +218,8 @@ export async function getAgentContext(
     name: sectionName,
     bgColor: sectionGroup.bgColor || "#FFFFFF",
     bounds: {
-      x: Math.round(sectionGroup.minY),
-      y: Math.round(sectionGroup.minY),
+      x: 0,
+      y: Math.round(sectionGroup.minY - frameOffsetY),
       width: frame.absoluteBoundingBox?.width || 0,
       height: Math.round(sectionGroup.maxY - sectionGroup.minY),
     },

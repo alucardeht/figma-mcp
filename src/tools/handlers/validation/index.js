@@ -15,3 +15,4 @@ export {
   testAllBreakpoints
 } from './responsiveValidation.js';
 export { validateImplementation } from './validateImplementation.js';
+export * from './sectionHelpers.js';

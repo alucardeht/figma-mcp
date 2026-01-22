@@ -115,6 +115,7 @@ This ensures the MCP output matches what you actually see in Figma's design view
 
 | Tool | Description |
 |------|-------------|
+| `validate_implementation(file_key, url, figma_node_id, ...)` | Pixel-perfect comparison between Figma and browser, results organized by visual sections with match scores, bounds, colors, and CSS tree |
 | `check_layout_bounds(file_key, page_name, frame_name)` | Detect content overflow |
 | `compare_element_position(file_key, page_name, frame_name, element_name, browser_x, browser_y)` | Compare position: Figma vs browser |
 | `compare_element_dimensions(file_key, page_name, frame_name, element_name, browser_width, browser_height)` | Compare dimensions: Figma vs browser |

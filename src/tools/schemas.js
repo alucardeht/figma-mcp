@@ -695,7 +695,25 @@ USAGE TIPS:
 1. Call get_frame_info first to verify frame exists and get dimensions
 2. Use figma_node_id for fastest access (no page/frame name searching)
 3. For responsive testing, call with different viewport sizes
-4. Adjust threshold (0-1) for stricter/looser pixel comparison`,
+4. Adjust threshold (0-1) for stricter/looser pixel comparison
+
+RETURN STRUCTURE:
+Results are automatically organized by visual sections (detected by background color):
+- status: PASS | FAIL | PARTIAL
+- overall_score: averaged match_score across all sections (0-100)
+- sections[]: array of detected visual sections, each containing:
+  * id: section identifier
+  * name: descriptive section name
+  * status: section-level validation status
+  * match_score: pixel-perfect match percentage for this section
+  * bounds: {x, y, width, height} coordinates
+  * bgColor: section background color
+  * css_tree: hierarchical CSS structure of elements in section
+  * problems[]: list of detected mismatches
+  * recommendations[]: suggestions to fix issues
+- dependencies[]: elements that cross multiple sections
+- implementation_order[]: suggested build sequence for sections
+- legend: field explanations and color codes`,
     inputSchema: {
       type: "object",
       properties: {

@@ -41,7 +41,7 @@ function getBackgroundColor(node) {
   return null;
 }
 
-function groupNodesBySection(children) {
+export function groupNodesBySection(children) {
   const sections = [];
   let currentSection = null;
   let currentBgColor = null;
@@ -146,7 +146,7 @@ function extractIconsAndImages(section, sectionId) {
   return { icons, images };
 }
 
-function findTransitionElements(sections, frameChildren) {
+export function findTransitionElements(sections, frameChildren) {
   const transitionElements = [];
 
   for (const child of frameChildren) {
@@ -215,14 +215,15 @@ export async function analyzePageStructure(ctx, fileKey, pageName, frameName) {
   const frameChildren = frame.children || [];
 
   const sectionGroups = groupNodesBySection(frameChildren);
+  const frameOffsetY = frame.absoluteBoundingBox?.y || 0;
 
   const sections = sectionGroups.map((sectionGroup, idx) => {
     const firstNode = sectionGroup.nodes[0];
     const inferredName = inferSectionName(firstNode.name) || `Section ${idx + 1}`;
 
     const sectionBounds = {
-      x: Math.round(sectionGroup.minY),
-      y: Math.round(sectionGroup.minY),
+      x: 0,
+      y: Math.round(sectionGroup.minY - frameOffsetY),
       width: frame.absoluteBoundingBox?.width || 0,
       height: Math.round(sectionGroup.maxY - sectionGroup.minY),
     };

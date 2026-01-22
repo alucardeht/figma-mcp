@@ -1,4 +1,4 @@
-import { captureScreenshot, checkChromeAvailable, DEFAULT_CDP_PORT, captureScreenshotRegion } from '../../../services/cdpClient.js';
+import { captureScreenshot, captureScreenshotRegion, checkChromeAvailable, DEFAULT_CDP_PORT } from '../../../services/cdpClient.js';
 import { compareImages } from '../../../services/imageComparator.js';
 import { extractViewportFromNode } from '../../../utils/nodeHelpers.js';
 import { convertNodeIdToApiFormat } from '../../../utils/nodeId.js';
@@ -13,6 +13,17 @@ import {
   CHUNK_THRESHOLD,
   DEFAULT_CHUNK_SIZE
 } from '../../../utils/chunkedValidation.js';
+import {
+  extractCssTree,
+  buildSectionLegend,
+  buildDependencyMap,
+  calculateImplementationOrder,
+  determineSectionStatus,
+  determineOverallStatus,
+  analyzeSectionProblems
+} from './sectionHelpers.js';
+import { groupNodesBySection, findTransitionElements } from '../pageStructure.js';
+import sharp from 'sharp';
 
 export async function validateImplementation(ctx, args) {
   const { figmaClient, chunker, session } = ctx;
@@ -225,6 +236,22 @@ export async function validateImplementation(ctx, args) {
 
     const passed = comparison.matchScore >= pass_threshold;
 
+    const hasFrameStructure = figmaNode.children && figmaNode.children.length > 0;
+
+    if (hasFrameStructure) {
+      return await organizeBySections(
+        figmaClient,
+        figmaImageBuffer,
+        browserImageBuffer,
+        comparison,
+        figmaNode,
+        actualViewport,
+        file_key,
+        pass_threshold,
+        chunker
+      );
+    }
+
     const result = {
       status: passed ? "PASS" : "FAIL",
       match_score: comparison.matchScore,
@@ -430,6 +457,188 @@ async function validateChunked(params, figmaClient, figmaNode, viewport) {
           status: "CHUNKED_VALIDATION_ERROR",
           error: error.message,
           hint: "Erro durante validação chunked. Verifique se chunkedValidation.js está configurado corretamente"
+        }, null, 2)
+      }]
+    };
+  }
+}
+
+async function organizeBySections(
+  figmaClient,
+  figmaImageBuffer,
+  browserImageBuffer,
+  globalComparison,
+  figmaNode,
+  actualViewport,
+  file_key,
+  pass_threshold,
+  chunker
+) {
+  try {
+    const frameChildren = figmaNode.children || [];
+    const sectionGroups = groupNodesBySection(frameChildren);
+    const transitionElements = findTransitionElements(sectionGroups, frameChildren);
+
+    const frameOffsetY = figmaNode.absoluteBoundingBox?.y || 0;
+
+    const sections = sectionGroups.map((sectionGroup, idx) => {
+      const firstNode = sectionGroup.nodes[0];
+      const sectionBounds = {
+        x: 0,
+        y: Math.round(sectionGroup.minY - frameOffsetY),
+        width: Math.round(figmaNode.absoluteBoundingBox?.width || actualViewport.width),
+        height: Math.round(sectionGroup.maxY - sectionGroup.minY)
+      };
+
+      return {
+        id: `section-${idx}`,
+        name: firstNode.name || `Section ${idx + 1}`,
+        bounds: sectionBounds,
+        bgColor: sectionGroup.bgColor || '#FFFFFF',
+        figmaNodes: sectionGroup.nodes,
+        nodeGroup: sectionGroup
+      };
+    });
+
+    const sectionResults = [];
+    let totalMatch = 0;
+    let failedCount = 0;
+
+    for (const section of sections) {
+      try {
+        const figmaChunk = await sharp(figmaImageBuffer)
+          .extract({
+            left: Math.round(section.bounds.x),
+            top: Math.round(section.bounds.y),
+            width: Math.round(section.bounds.width),
+            height: Math.round(section.bounds.height)
+          })
+          .toBuffer();
+
+        const browserChunk = await sharp(browserImageBuffer)
+          .extract({
+            left: Math.round(section.bounds.x),
+            top: Math.round(section.bounds.y),
+            width: Math.round(section.bounds.width),
+            height: Math.round(section.bounds.height)
+          })
+          .toBuffer();
+
+        const comparison = await compareImages(figmaChunk, browserChunk, {
+          threshold: 0.1,
+          includeDiffImage: true
+        });
+
+        if (!comparison.success) {
+          sectionResults.push({
+            id: section.id,
+            name: section.name,
+            status: 'ERROR',
+            match_score: 0,
+            bounds: section.bounds,
+            bgColor: section.bgColor,
+            error: comparison.error,
+            problems: [],
+            css_tree: null,
+            recommendations: []
+          });
+          failedCount++;
+          continue;
+        }
+
+        const status = determineSectionStatus(comparison.matchScore, pass_threshold);
+        const problems = analyzeSectionProblems(comparison.regions, section);
+        const cssTree = section.figmaNodes.length > 0
+          ? extractCssTree(section.figmaNodes[0])
+          : null;
+
+        const recommendations = [];
+        if (problems.length > 0) {
+          const criticalProblems = problems.filter(p => p.severity === 'critical');
+          if (criticalProblems.length > 0) {
+            recommendations.push('Fix critical regions: ' + criticalProblems.map(p => p.area).join(', '));
+          }
+          recommendations.push('Verify CSS properties match Figma design exactly');
+          recommendations.push('Check that all images and icons are loading');
+        }
+
+        sectionResults.push({
+          id: section.id,
+          name: section.name,
+          status,
+          match_score: comparison.matchScore,
+          bounds: section.bounds,
+          bgColor: section.bgColor,
+          problems: problems.length > 0 ? problems : [],
+          css_tree: cssTree,
+          recommendations: recommendations.length > 0 ? recommendations : []
+        });
+
+        totalMatch += comparison.matchScore;
+        if (status === 'FAIL') failedCount++;
+
+      } catch (error) {
+        sectionResults.push({
+          id: section.id,
+          name: section.name,
+          status: 'ERROR',
+          match_score: 0,
+          bounds: section.bounds,
+          bgColor: section.bgColor,
+          error: error.message,
+          problems: [],
+          css_tree: null,
+          recommendations: []
+        });
+        failedCount++;
+      }
+    }
+
+    const overallScore = sectionResults.length > 0
+      ? totalMatch / sectionResults.length
+      : 0;
+
+    const overallStatus = determineOverallStatus(failedCount, sectionResults.length);
+
+    const dependencies = buildDependencyMap(transitionElements, sections);
+    const implementationOrder = calculateImplementationOrder(sections, dependencies);
+
+    const nextAction = overallStatus === 'PASS'
+      ? 'All sections validated successfully. Proceed to next step.'
+      : `${failedCount} section(s) need fixes. Start with section ${implementationOrder[0]?.sectionId || 'section-0'} (${implementationOrder[0]?.sectionName || 'first section'})`;
+
+    const result = {
+      status: overallStatus,
+      overall_score: parseFloat(overallScore.toFixed(1)),
+      pass_threshold,
+      legend: buildSectionLegend(),
+      sections: sectionResults,
+      dependencies: dependencies.length > 0 ? dependencies : [],
+      implementation_order: implementationOrder,
+      next_action: nextAction,
+      summary: `Validated ${sectionResults.length} sections. Overall match: ${overallScore.toFixed(1)}%. ${failedCount} section(s) below threshold.`
+    };
+
+    const wrappedResponse = chunker
+      ? chunker.wrapResponse(result, {
+        step: 'Section-by-section validation',
+        progress: `${sectionResults.length} sections analyzed`,
+        nextStep: nextAction
+      })
+      : result;
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(wrappedResponse, null, 2) }]
+    };
+
+  } catch (error) {
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          status: 'ERROR',
+          error: error.message,
+          hint: 'Erro ao organizar validação por seções. Verifique se figmaNode contém children.'
         }, null, 2)
       }]
     };
