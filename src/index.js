@@ -4,7 +4,7 @@ import { registerAllTools } from './tools/register.js';
 import { TokenEstimator, SessionManager, ResponseChunker } from './classes/index.js';
 import FigmaClient from './api/figma.js';
 
-const FIGMA_API_TOKEN = process.env.FIGMA_API_TOKEN;
+const FIGMA_ACCESS_TOKEN = process.env.FIGMA_ACCESS_TOKEN;
 
 class FigmaMCPServer {
   constructor() {
@@ -16,7 +16,7 @@ class FigmaMCPServer {
     this.tokenEstimator = new TokenEstimator();
     this.session = new SessionManager();
     this.chunker = new ResponseChunker(this.tokenEstimator, this.session);
-    this.figmaClient = new FigmaClient(FIGMA_API_TOKEN);
+    this.figmaClient = new FigmaClient(FIGMA_ACCESS_TOKEN);
 
     this.ctx = {
       figmaClient: this.figmaClient,

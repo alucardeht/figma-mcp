@@ -1,4 +1,344 @@
+import { colorToHex, collectStyles, countElements } from '../../utils/index.js';
+import { isIconNode, isImageNode, buildAssetName } from '../../utils/assetHelpers.js';
+
 const DEFAULT_MAX_DEPTH = 4;
+
+export const SECTION_KEYWORDS = {
+  hero: ['hero', 'header', 'banner', 'top', 'welcome'],
+  about: ['about', 'team', 'info', 'description', 'story'],
+  features: ['feature', 'services', 'capability', 'benefit'],
+  pricing: ['price', 'plan', 'cost', 'billing'],
+  contact: ['contact', 'footer', 'reach', 'connect'],
+  cta: ['cta', 'call-to-action', 'action', 'button'],
+  testimonial: ['testimonial', 'review', 'feedback', 'quote'],
+  faq: ['faq', 'question', 'answer', 'qa'],
+  gallery: ['gallery', 'portfolio', 'showcase', 'grid'],
+  form: ['form', 'input', 'field', 'signup'],
+  nav: ['nav', 'navigation', 'menu'],
+  section: ['section', 'container', 'wrapper'],
+};
+
+export function inferSectionName(elementName) {
+  const lowerName = elementName.toLowerCase();
+
+  for (const [sectionName, keywords] of Object.entries(SECTION_KEYWORDS)) {
+    if (keywords.some(kw => lowerName.includes(kw))) {
+      return sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
+    }
+  }
+
+  return null;
+}
+
+export function getBackgroundColor(node) {
+  if (!node.fills || node.fills.length === 0) {
+    return null;
+  }
+
+  const solidFill = node.fills.find(f => f.type === 'SOLID' && f.visible !== false);
+  if (solidFill) {
+    return colorToHex(solidFill.color);
+  }
+
+  return null;
+}
+
+export function groupNodesBySection(children) {
+  const sections = [];
+  let currentSection = null;
+  let currentBgColor = null;
+  let currentY = 0;
+
+  for (const child of children) {
+    if (!child.absoluteBoundingBox) continue;
+
+    const bgColor = getBackgroundColor(child);
+    const yPos = Math.round(child.absoluteBoundingBox.y);
+    const heightDiff = Math.abs(yPos - currentY);
+
+    const colorChanged = bgColor && bgColor !== currentBgColor && bgColor !== '#FFFFFF';
+    const significantGap = heightDiff > 50;
+
+    if (colorChanged || (significantGap && currentSection && currentSection.nodes.length > 0)) {
+      if (currentSection && currentSection.nodes.length > 0) {
+        sections.push(currentSection);
+      }
+      currentSection = {
+        nodes: [child],
+        bgColor: bgColor || currentBgColor,
+        minY: yPos,
+        maxY: yPos + Math.round(child.absoluteBoundingBox.height),
+      };
+      currentBgColor = bgColor || currentBgColor;
+    } else {
+      if (!currentSection) {
+        currentSection = {
+          nodes: [child],
+          bgColor: bgColor,
+          minY: yPos,
+          maxY: yPos + Math.round(child.absoluteBoundingBox.height),
+        };
+        currentBgColor = bgColor;
+      } else {
+        currentSection.nodes.push(child);
+        currentSection.maxY = Math.max(
+          currentSection.maxY,
+          yPos + Math.round(child.absoluteBoundingBox.height)
+        );
+      }
+    }
+
+    currentY = yPos;
+  }
+
+  if (currentSection && currentSection.nodes.length > 0) {
+    sections.push(currentSection);
+  }
+
+  return sections;
+}
+
+export function findTransitionElements(sections, frameChildren) {
+  const transitionElements = [];
+
+  for (const child of frameChildren) {
+    if (!child.absoluteBoundingBox) continue;
+
+    const childTop = Math.round(child.absoluteBoundingBox.y);
+    const childBottom = childTop + Math.round(child.absoluteBoundingBox.height);
+
+    let spanningSections = [];
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
+      if (childTop < section.maxY && childBottom > section.minY) {
+        spanningSections.push(`section-${i}`);
+      }
+    }
+
+    if (spanningSections.length > 1) {
+      transitionElements.push({
+        id: child.id,
+        name: child.name,
+        type: child.type,
+        bounds: {
+          x: Math.round(child.absoluteBoundingBox.x),
+          y: Math.round(child.absoluteBoundingBox.y),
+          width: Math.round(child.absoluteBoundingBox.width),
+          height: Math.round(child.absoluteBoundingBox.height),
+        },
+        spansSections: spanningSections,
+      });
+    }
+  }
+
+  return transitionElements;
+}
+
+export function extractSectionAssets(sectionNodes, fileKey, sectionName, sectionId) {
+  const icons = [];
+  const images = [];
+
+  function traverse(node, path = []) {
+    const currentPath = [...path, node.name];
+
+    if (isIconNode(node)) {
+      const uniqueName = buildAssetName(currentPath, { sectionName });
+      icons.push({
+        id: node.id,
+        uniqueName,
+        originalName: node.name,
+        path: currentPath,
+        bounds: {
+          x: Math.round(node.absoluteBoundingBox?.x || 0),
+          y: Math.round(node.absoluteBoundingBox?.y || 0),
+          width: Math.round(node.absoluteBoundingBox?.width || 0),
+          height: Math.round(node.absoluteBoundingBox?.height || 0),
+        },
+        exportUrl: `https://api.figma.com/v1/images/${fileKey}?ids=${node.id}&format=svg&scale=2`,
+      });
+    } else if (isImageNode(node)) {
+      const uniqueName = buildAssetName(currentPath, { sectionName });
+      images.push({
+        id: node.id,
+        uniqueName,
+        originalName: node.name,
+        path: currentPath,
+        bounds: {
+          x: Math.round(node.absoluteBoundingBox?.x || 0),
+          y: Math.round(node.absoluteBoundingBox?.y || 0),
+          width: Math.round(node.absoluteBoundingBox?.width || 0),
+          height: Math.round(node.absoluteBoundingBox?.height || 0),
+        },
+        exportUrl: `https://api.figma.com/v1/images/${fileKey}?ids=${node.id}&format=png&scale=2`,
+      });
+    }
+
+    if (node.children && !isIconNode(node) && !isImageNode(node)) {
+      for (const child of node.children || []) {
+        traverse(child, currentPath);
+      }
+    }
+  }
+
+  for (const node of sectionNodes) {
+    traverse(node);
+  }
+
+  return { icons, images };
+}
+
+export function extractSectionStyles(sectionNodes) {
+  const styles = {
+    colors: new Set(),
+    fonts: new Set(),
+    fontSizes: new Set(),
+    borderRadii: new Set(),
+    spacing: new Set(),
+    shadows: [],
+  };
+
+  for (const node of sectionNodes) {
+    collectStyles(node, styles);
+  }
+
+  return {
+    colors: [...styles.colors].sort(),
+    fonts: [...styles.fonts].sort(),
+    fontSizes: [...styles.fontSizes].sort((a, b) => a - b),
+    borderRadii: [...styles.borderRadii].sort((a, b) => a - b),
+    spacing: [...styles.spacing].sort((a, b) => a - b),
+    shadows: styles.shadows,
+  };
+}
+
+export function countAssetsOnly(nodes) {
+  let icons = 0;
+  let images = 0;
+
+  function traverse(node) {
+    if (isIconNode(node)) {
+      icons++;
+    } else if (isImageNode(node)) {
+      images++;
+    }
+
+    if (node.children && !isIconNode(node) && !isImageNode(node)) {
+      for (const child of node.children || []) {
+        traverse(child);
+      }
+    }
+  }
+
+  for (const node of nodes) {
+    traverse(node);
+  }
+
+  return { icons, images };
+}
+
+export function buildAgentInstructions(section, agentInfo, responsibilities, assets, styles) {
+  const { index, total, isFirst, isLast } = agentInfo;
+  const { implements: implementList = [], coordinates = [], skips = [] } = responsibilities;
+
+  let instructions = `# Agent ${index} - ${section.name} Section\n\n`;
+
+  instructions += `## Your Responsibility\n`;
+  instructions += `You are responsible for implementing the **${section.name}** section.\n`;
+  instructions += `- This is section ${index + 1} of ${total}\n`;
+  instructions += `- Background color: ${section.bgColor}\n`;
+  instructions += `- Bounds: ${section.bounds.width}x${section.bounds.height}px at (${section.bounds.x}, ${section.bounds.y})\n\n`;
+
+  instructions += `## What You Implement\n`;
+  if (implementList.length > 0) {
+    instructions += `You fully implement these components:\n`;
+    implementList.forEach((item) => {
+      instructions += `- ${item}\n`;
+    });
+  } else {
+    instructions += `No direct child components to implement.\n`;
+  }
+  instructions += '\n';
+
+  instructions += `## What You Coordinate\n`;
+  if (coordinates.length > 0) {
+    instructions += `These elements span multiple sections and need coordination:\n`;
+    coordinates.forEach((item) => {
+      instructions += `- ${item} (handle carefully - may affect adjacent sections)\n`;
+    });
+  } else {
+    instructions += `No transition elements affecting this section.\n`;
+  }
+  instructions += '\n';
+
+  instructions += `## What You Skip\n`;
+  if (skips.length > 0) {
+    instructions += `These belong to other sections - do NOT implement:\n`;
+    skips.forEach((item) => {
+      instructions += `- ${item}\n`;
+    });
+  } else {
+    instructions += `No elements to skip.\n`;
+  }
+  instructions += '\n';
+
+  instructions += `## Assets Available\n`;
+  if (assets.icons && assets.icons.length > 0) {
+    instructions += `**Icons (${assets.icons.length}):**\n`;
+    assets.icons.slice(0, 10).forEach((icon) => {
+      const iconName = icon.uniqueName || icon.name;
+      instructions += `- ${iconName} (${icon.bounds.width}x${icon.bounds.height}px)\n`;
+    });
+    if (assets.icons.length > 10) {
+      instructions += `- ... and ${assets.icons.length - 10} more\n`;
+    }
+  }
+
+  if (assets.images && assets.images.length > 0) {
+    instructions += `\n**Images (${assets.images.length}):**\n`;
+    assets.images.slice(0, 5).forEach((image) => {
+      const imageName = image.uniqueName || image.name;
+      instructions += `- ${imageName} (${image.bounds.width}x${image.bounds.height}px)\n`;
+    });
+    if (assets.images.length > 5) {
+      instructions += `- ... and ${assets.images.length - 5} more\n`;
+    }
+  }
+
+  if ((!assets.icons || assets.icons.length === 0) && (!assets.images || assets.images.length === 0)) {
+    instructions += `No icons or images in this section.\n`;
+  }
+  instructions += '\n';
+
+  instructions += `## Design Tokens\n`;
+  if (styles.colors && styles.colors.length > 0) {
+    instructions += `**Colors:** ${styles.colors.slice(0, 5).join(', ')}${styles.colors.length > 5 ? ` ... (${styles.colors.length} total)` : ''}\n`;
+  }
+  if (styles.fonts && styles.fonts.length > 0) {
+    instructions += `**Fonts:** ${styles.fonts.slice(0, 3).join(', ')}${styles.fonts.length > 3 ? ` ... (${styles.fonts.length} total)` : ''}\n`;
+  }
+  if (styles.spacing && styles.spacing.length > 0) {
+    instructions += `**Spacing:** ${styles.spacing.slice(0, 5).join(', ')}px${styles.spacing.length > 5 ? ` ... (${styles.spacing.length} total)` : ''}\n`;
+  }
+
+  instructions += '\n## Coordination Rules\n';
+  if (isFirst && total > 1) {
+    instructions += `- You are the **first agent** - ensure clean top boundary\n`;
+  }
+  if (isLast && total > 1) {
+    instructions += `- You are the **last agent** - ensure clean bottom boundary\n`;
+  }
+  if (!isFirst && !isLast && total > 1) {
+    instructions += `- You are a **middle agent** - ensure clean top and bottom boundaries\n`;
+  }
+  if (total === 1) {
+    instructions += `- You are implementing the entire frame - ensure all boundaries are clean\n`;
+  }
+
+  instructions += `- Coordinate with adjacent agents through transition elements\n`;
+  instructions += `- Test integration with the full layout\n`;
+
+  return instructions;
+}
 
 export function rgbToHex(color) {
   if (!color) return '#000000';

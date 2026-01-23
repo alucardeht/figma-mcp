@@ -1,57 +1,23 @@
 import * as repeatLast from './definitions/repeatLast.js';
 import * as getSessionState from './definitions/getSessionState.js';
 import * as resetSession from './definitions/resetSession.js';
-import * as listPages from './definitions/listPages.js';
-import * as listFrames from './definitions/listFrames.js';
-import * as getFrameInfo from './definitions/getFrameInfo.js';
-import * as getScreenshot from './definitions/getScreenshot.js';
-import * as extractStyles from './definitions/extractStyles.js';
-import * as getFileStyles from './definitions/getFileStyles.js';
+import * as figmaGet from './definitions/figmaGet.js';
+import * as figmaScreenshot from './definitions/figmaScreenshot.js';
 import * as extractAssets from './definitions/extractAssets.js';
-import * as searchComponents from './definitions/searchComponents.js';
-import * as analyzePageStructure from './definitions/analyzePageStructure.js';
-import * as getSectionScreenshot from './definitions/getSectionScreenshot.js';
-import * as getAgentContext from './definitions/getAgentContext.js';
-import * as getFullPageContext from './definitions/getFullPageContext.js';
-import * as checkLayoutBounds from './definitions/checkLayoutBounds.js';
-import * as compareElementPosition from './definitions/compareElementPosition.js';
-import * as compareElementDimensions from './definitions/compareElementDimensions.js';
-import * as validateLayout from './definitions/validateLayout.js';
-import * as compareVisual from './definitions/compareVisual.js';
-import * as verifyElementsPresent from './definitions/verifyElementsPresent.js';
-import * as verifyAssetsLoaded from './definitions/verifyAssetsLoaded.js';
-import * as verifyImplementationV2 from './definitions/verifyImplementationV2.js';
-import * as validateResponsiveBreakpoint from './definitions/validateResponsiveBreakpoint.js';
-import * as testAllBreakpoints from './definitions/testAllBreakpoints.js';
-import * as validateImplementation from './definitions/validateImplementation.js';
+import * as figmaStyles from './definitions/figmaStyles.js';
+import * as figmaValidate from './definitions/figmaValidate.js';
+import * as figmaContext from './definitions/figmaContext.js';
 
 const tools = [
   repeatLast,
   getSessionState,
   resetSession,
-  listPages,
-  listFrames,
-  getFrameInfo,
-  getScreenshot,
-  extractStyles,
-  getFileStyles,
+  figmaGet,
+  figmaScreenshot,
   extractAssets,
-  searchComponents,
-  analyzePageStructure,
-  getSectionScreenshot,
-  getAgentContext,
-  getFullPageContext,
-  checkLayoutBounds,
-  compareElementPosition,
-  compareElementDimensions,
-  validateLayout,
-  compareVisual,
-  verifyElementsPresent,
-  verifyAssetsLoaded,
-  verifyImplementationV2,
-  validateResponsiveBreakpoint,
-  testAllBreakpoints,
-  validateImplementation,
+  figmaStyles,
+  figmaValidate,
+  figmaContext,
 ];
 
 export function registerAllTools(server, ctx) {
