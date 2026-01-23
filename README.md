@@ -13,7 +13,7 @@ v3.0.0 — Compact tree output format with 95% token savings.
 ### Claude Code
 
 ```bash
-claude mcp add figma -e FIGMA_API_TOKEN=your-token-here -- npx -y github:alucardeht/figma-mcp
+claude mcp add figma -e FIGMA_ACCESS_TOKEN=your-token-here -- npx -y github:alucardeht/figma-mcp
 ```
 
 ### Get your Figma Token
