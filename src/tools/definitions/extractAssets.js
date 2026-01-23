@@ -1,10 +1,23 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import axios from "axios";
-import { findAssets, buildAssetName, buildAssetPath, getSectionFromPath, isCompositeGroup } from "../../utils/assetHelpers.js";
+import { z } from 'zod';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import axios from 'axios';
+import { findAssets, buildAssetName, buildAssetPath, getSectionFromPath, isCompositeGroup } from '../../utils/assetHelpers.js';
 
-export async function extractAssets(ctx, fileKey, pageName, frameName, outputDir) {
+export const name = 'extract_assets';
+
+export const description = 'Extract all assets from frame with progress tracking. Detects composite groups (isCompositeAsset:true) and exports as single PNG. Categorizes into icons/, images/, composites/.';
+
+export const inputSchema = {
+  file_key: z.string().describe('Figma file key'),
+  page_name: z.string().describe('Page name (partial match)'),
+  frame_name: z.string().describe('Frame name (partial match)'),
+  output_dir: z.string().default('./figma-assets').describe('Output directory (default: ./figma-assets)'),
+};
+
+export async function handler(args, ctx) {
   const { chunker, figmaClient } = ctx;
+  const { file_key: fileKey, page_name: pageName, frame_name: frameName, output_dir: outputDir } = args;
 
   const file = await figmaClient.getFile(fileKey, 2);
   const page = figmaClient.findPageByName(file, pageName);
@@ -16,9 +29,9 @@ export async function extractAssets(ctx, fileKey, pageName, frameName, outputDir
   const frame = await figmaClient.getNode(fileKey, frameRef.id);
   const assets = findAssets(frame, { collectBounds: true });
 
-  const iconsDir = join(outputDir, "icons");
-  const imagesDir = join(outputDir, "images");
-  const compositeDir = join(imagesDir, "composites");
+  const iconsDir = join(outputDir, 'icons');
+  const imagesDir = join(outputDir, 'images');
+  const compositeDir = join(imagesDir, 'composites');
   await mkdir(iconsDir, { recursive: true });
   await mkdir(imagesDir, { recursive: true });
   await mkdir(compositeDir, { recursive: true });
@@ -29,17 +42,17 @@ export async function extractAssets(ctx, fileKey, pageName, frameName, outputDir
 
   for (let i = 0; i < assets.length; i += batchSize) {
     const batch = assets.slice(i, i + batchSize);
-    const ids = batch.map((a) => a.id).join(",");
+    const ids = batch.map((a) => a.id).join(',');
 
     try {
-      const svgData = await figmaClient.getImage(fileKey, ids, "svg");
-      const pngData = await figmaClient.getImage(fileKey, ids, "png", 2);
+      const svgData = await figmaClient.getImage(fileKey, ids, 'svg');
+      const pngData = await figmaClient.getImage(fileKey, ids, 'png', 2);
 
       for (const asset of batch) {
         try {
           if (asset.isComposite) {
             if (pngData.images[asset.id]) {
-              const pngResponse = await axios.get(pngData.images[asset.id], { responseType: "arraybuffer" });
+              const pngResponse = await axios.get(pngData.images[asset.id], { responseType: 'arraybuffer' });
               const filePath = join(compositeDir, `${asset.name}.png`);
               await writeFile(filePath, Buffer.from(pngResponse.data));
               results.composites.push({
@@ -52,7 +65,7 @@ export async function extractAssets(ctx, fileKey, pageName, frameName, outputDir
               });
               assetMap[asset.name] = filePath;
             }
-          } else if (asset.category === "icon" && svgData.images[asset.id]) {
+          } else if (asset.category === 'icon' && svgData.images[asset.id]) {
             const svgResponse = await axios.get(svgData.images[asset.id]);
             const filePath = join(iconsDir, `${asset.name}.svg`);
             await writeFile(filePath, svgResponse.data);
@@ -65,7 +78,7 @@ export async function extractAssets(ctx, fileKey, pageName, frameName, outputDir
             });
             assetMap[asset.name] = filePath;
           } else if (pngData.images[asset.id]) {
-            const pngResponse = await axios.get(pngData.images[asset.id], { responseType: "arraybuffer" });
+            const pngResponse = await axios.get(pngData.images[asset.id], { responseType: 'arraybuffer' });
             const filePath = join(imagesDir, `${asset.name}.png`);
             await writeFile(filePath, Buffer.from(pngResponse.data));
             results.images.push({
@@ -111,11 +124,11 @@ export async function extractAssets(ctx, fileKey, pageName, frameName, outputDir
       failed: results.failed,
     },
     {
-      step: "Asset extraction complete",
+      step: 'Asset extraction complete',
       progress: `${results.icons.length} icons, ${results.images.length} images, ${results.composites.length} composite groups`,
-      nextStep: "Assets saved to disk. Use extract_styles for design tokens.",
+      nextStep: 'Assets saved to disk. Use extract_styles for design tokens.',
     }
   );
 
-  return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+  return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
 }

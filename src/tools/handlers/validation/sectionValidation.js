@@ -1,1 +1,0 @@
-throw new Error('sectionValidation.js foi descontinuado. Use validateImplementation diretamente. A organização por seções é automática quando o frame tem children. Funções auxiliares foram movidas para sectionHelpers.js');

@@ -1,6 +1,21 @@
-export async function searchComponents(ctx, fileKey, query, pageName, type, continueFlag = false) {
+import { z } from 'zod';
+
+export const name = 'search_components';
+
+export const description = 'Search components by name across file or specific page. Returns top 20 results. Use continue:true for more, or refine with page_name/type filter.';
+
+export const inputSchema = {
+  file_key: z.string().describe('Figma file key'),
+  query: z.string().describe('Search term (case-insensitive, partial match)'),
+  page_name: z.string().optional().describe('Limit search to specific page'),
+  type: z.string().optional().describe('Filter by type: COMPONENT, INSTANCE, FRAME, TEXT, VECTOR'),
+  continue: z.boolean().optional().describe('Continue from last response for more results'),
+};
+
+export async function handler(args, ctx) {
   const { session, chunker, figmaClient } = ctx;
-  const operationId = `search_components:${fileKey}:${query}:${pageName || "all"}:${type || "all"}`;
+  const { file_key: fileKey, query, page_name: pageName, type, continue: continueFlag = false } = args;
+  const operationId = `search_components:${fileKey}:${query}:${pageName || 'all'}:${type || 'all'}`;
 
   if (continueFlag && session.hasPendingChunks(operationId)) {
     const chunk = session.getNextChunk(operationId);
@@ -9,11 +24,11 @@ export async function searchComponents(ctx, fileKey, query, pageName, type, cont
       {
         step: `Showing results ${(chunk.chunkIndex - 1) * 20 + 1}-${Math.min(chunk.chunkIndex * 20, chunk.totalItems)}`,
         progress: `${chunk.chunkIndex}/${chunk.totalChunks}`,
-        nextStep: chunk.chunkIndex < chunk.totalChunks ? "Call with continue=true for more" : "Use get_frame_info on specific result",
+        nextStep: chunk.chunkIndex < chunk.totalChunks ? 'Call with continue=true for more' : 'Use get_frame_info on specific result',
         operationId,
       }
     );
-    return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
   }
 
   const file = await figmaClient.getFile(fileKey, 99);
@@ -34,7 +49,7 @@ export async function searchComponents(ctx, fileKey, query, pageName, type, cont
         type: node.type,
         id: node.id,
         page: pageNameLocal,
-        path: path.join(" > "),
+        path: path.join(' > '),
         bounds: node.absoluteBoundingBox
           ? {
               width: Math.round(node.absoluteBoundingBox.width),
@@ -65,27 +80,27 @@ export async function searchComponents(ctx, fileKey, query, pageName, type, cont
       {
         step: `Showing results 1-${chunked.items.length} of ${results.length}`,
         progress: `1/${chunked.totalChunks}`,
-        nextStep: "Call with continue=true for more, or refine search",
+        nextStep: 'Call with continue=true for more, or refine search',
         alert: `Found ${results.length} matches - showing first 20`,
         refinementOptions: [
-          pageNames.length > 1 ? `Filter by page: ${pageNames.slice(0, 3).join(", ")}` : null,
-          types.length > 1 ? `Filter by type: ${types.join(", ")}` : null,
-          "Use more specific search term",
+          pageNames.length > 1 ? `Filter by page: ${pageNames.slice(0, 3).join(', ')}` : null,
+          types.length > 1 ? `Filter by type: ${types.join(', ')}` : null,
+          'Use more specific search term',
         ].filter(Boolean),
         operationId,
       }
     );
-    return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
   }
 
   const response = chunker.wrapResponse(
     { query, resultCount: results.length, results },
     {
-      step: "Search complete",
+      step: 'Search complete',
       progress: `${results.length} results`,
-      nextStep: results.length > 0 ? "Use get_frame_info on a result for details" : "Try different search term",
+      nextStep: results.length > 0 ? 'Use get_frame_info on a result for details' : 'Try different search term',
     }
   );
 
-  return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+  return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
 }

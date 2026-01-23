@@ -1,21 +1,37 @@
-import axios from "axios";
-import sharp from "sharp";
-import { colorToHex, collectStyles, countElements } from "../../utils/index.js";
-import { isIconNode, isImageNode, buildAssetName, findAssets } from "../../utils/assetHelpers.js";
+import { z } from 'zod';
+import axios from 'axios';
+import sharp from 'sharp';
+import { colorToHex, collectStyles, countElements } from '../../utils/index.js';
+import { isIconNode, isImageNode, buildAssetName, findAssets } from '../../utils/assetHelpers.js';
+
+export const name = 'get_full_page_context';
+export const description = 'Get complete page context in ONE call with lazy loading support. Returns sections, styles (default), and optional screenshots, assets, agent instructions. Perfect for parallel multi-agent work and quick complexity assessment.';
+
+export const inputSchema = {
+  file_key: z.string().describe('Figma file key from URL'),
+  page_name: z.string().describe('Page name (partial match)'),
+  frame_name: z.string().describe('Frame name (partial match)'),
+  scale: z.number().optional().default(2).describe('Screenshot scale 1-4 (default: 2)'),
+  include_screenshots: z.boolean().optional().default(false).describe('Include base64 screenshots for each section (default: false, saves bandwidth)'),
+  include_assets: z.boolean().optional().default(false).describe('Include full asset objects with export URLs (default: false, only counts if false)'),
+  include_styles: z.boolean().optional().default(true).describe('Include design tokens: colors, fonts, spacing, shadows (default: true)'),
+  include_agent_instructions: z.boolean().optional().default(false).describe('Include detailed instructions for agents (default: false)'),
+  include_asset_map: z.boolean().optional().default(false).describe('Include consolidated asset map (only used with include_assets=true, default: false)'),
+};
 
 const SECTION_KEYWORDS = {
-  hero: ["hero", "header", "banner", "top", "welcome"],
-  about: ["about", "team", "info", "description", "story"],
-  features: ["feature", "services", "capability", "benefit"],
-  pricing: ["price", "plan", "cost", "billing"],
-  contact: ["contact", "footer", "reach", "connect"],
-  cta: ["cta", "call-to-action", "action", "button"],
-  testimonial: ["testimonial", "review", "feedback", "quote"],
-  faq: ["faq", "question", "answer", "qa"],
-  gallery: ["gallery", "portfolio", "showcase", "grid"],
-  form: ["form", "input", "field", "signup"],
-  nav: ["nav", "navigation", "menu"],
-  section: ["section", "container", "wrapper"],
+  hero: ['hero', 'header', 'banner', 'top', 'welcome'],
+  about: ['about', 'team', 'info', 'description', 'story'],
+  features: ['feature', 'services', 'capability', 'benefit'],
+  pricing: ['price', 'plan', 'cost', 'billing'],
+  contact: ['contact', 'footer', 'reach', 'connect'],
+  cta: ['cta', 'call-to-action', 'action', 'button'],
+  testimonial: ['testimonial', 'review', 'feedback', 'quote'],
+  faq: ['faq', 'question', 'answer', 'qa'],
+  gallery: ['gallery', 'portfolio', 'showcase', 'grid'],
+  form: ['form', 'input', 'field', 'signup'],
+  nav: ['nav', 'navigation', 'menu'],
+  section: ['section', 'container', 'wrapper'],
 };
 
 function inferSectionName(elementName) {
@@ -35,7 +51,7 @@ function getBackgroundColor(node) {
     return null;
   }
 
-  const solidFill = node.fills.find(f => f.type === "SOLID" && f.visible !== false);
+  const solidFill = node.fills.find(f => f.type === 'SOLID' && f.visible !== false);
   if (solidFill) {
     return colorToHex(solidFill.color);
   }
@@ -56,7 +72,7 @@ function groupNodesBySection(children) {
     const yPos = Math.round(child.absoluteBoundingBox.y);
     const heightDiff = Math.abs(yPos - currentY);
 
-    const colorChanged = bgColor && bgColor !== currentBgColor && bgColor !== "#FFFFFF";
+    const colorChanged = bgColor && bgColor !== currentBgColor && bgColor !== '#FFFFFF';
     const significantGap = heightDiff > 50;
 
     if (colorChanged || (significantGap && currentSection && currentSection.nodes.length > 0)) {
@@ -232,15 +248,15 @@ async function captureFullFrameImage(ctx, fileKey, frame, scale = 2) {
   const { figmaClient } = ctx;
 
   try {
-    const imageData = await figmaClient.getImage(fileKey, frame.id, "png", scale);
+    const imageData = await figmaClient.getImage(fileKey, frame.id, 'png', scale);
     const imageUrl = imageData.images[frame.id];
 
     if (!imageUrl) return null;
 
-    const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
+    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
     return Buffer.from(response.data);
   } catch (error) {
-    console.error("Failed to capture frame image:", error.message);
+    console.error('Failed to capture frame image:', error.message);
     return null;
   }
 }
@@ -266,9 +282,9 @@ async function extractSectionScreenshot(frameImageBuffer, sectionBounds, scale =
       .png()
       .toBuffer();
 
-    return croppedImage.toString("base64");
+    return croppedImage.toString('base64');
   } catch (error) {
-    console.error("Failed to extract section screenshot:", error.message);
+    console.error('Failed to extract section screenshot:', error.message);
     return null;
   }
 }
@@ -304,18 +320,18 @@ function buildAgentInstructions(section, agentIndex, totalAgents, assets, styles
         instructions += `- ... and ${assets.images.length - 5} more\n`;
       }
     }
-    instructions += "\n";
+    instructions += '\n';
   }
 
   instructions += `## Design Tokens\n`;
   if (styles.colors.length > 0) {
-    instructions += `**Colors (${styles.colors.length}):** ${styles.colors.slice(0, 5).join(", ")}${styles.colors.length > 5 ? " ..." : ""}\n`;
+    instructions += `**Colors (${styles.colors.length}):** ${styles.colors.slice(0, 5).join(', ')}${styles.colors.length > 5 ? ' ...' : ''}\n`;
   }
   if (styles.fonts.length > 0) {
-    instructions += `**Fonts (${styles.fonts.length}):** ${styles.fonts.slice(0, 3).join(", ")}${styles.fonts.length > 3 ? " ..." : ""}\n`;
+    instructions += `**Fonts (${styles.fonts.length}):** ${styles.fonts.slice(0, 3).join(', ')}${styles.fonts.length > 3 ? ' ...' : ''}\n`;
   }
   if (styles.spacing.length > 0) {
-    instructions += `**Spacing:** ${styles.spacing.slice(0, 5).join(", ")}px${styles.spacing.length > 5 ? " ..." : ""}\n`;
+    instructions += `**Spacing:** ${styles.spacing.slice(0, 5).join(', ')}px${styles.spacing.length > 5 ? ' ...' : ''}\n`;
   }
 
   instructions += `\n## Instructions\n`;
@@ -378,7 +394,7 @@ function buildAssetMap(sections) {
     for (const icon of section.assets.icons) {
       assetMap[icon.uniqueName] = {
         sectionId: section.id,
-        type: "icon",
+        type: 'icon',
         exportUrl: icon.exportUrl,
       };
     }
@@ -386,7 +402,7 @@ function buildAssetMap(sections) {
     for (const image of section.assets.images) {
       assetMap[image.uniqueName] = {
         sectionId: section.id,
-        type: "image",
+        type: 'image',
         exportUrl: image.exportUrl,
       };
     }
@@ -395,17 +411,17 @@ function buildAssetMap(sections) {
   return assetMap;
 }
 
-export async function getFullPageContext(ctx, args) {
+export async function handler(args, ctx) {
   const {
     file_key: fileKey,
     page_name: pageName,
     frame_name: frameName,
-    scale = 2,
-    include_screenshots = false,
-    include_assets = false,
-    include_styles = true,
-    include_agent_instructions = false,
-    include_asset_map = false,
+    scale,
+    include_screenshots,
+    include_assets,
+    include_styles,
+    include_agent_instructions,
+    include_asset_map,
   } = args;
 
   const { session, chunker, figmaClient } = ctx;
@@ -415,16 +431,16 @@ export async function getFullPageContext(ctx, args) {
   const page = figmaClient.findPageByName(file, pageName);
 
   if (!page) {
-    const available = (file.document.children || []).map((p) => p.name).join(", ");
+    const available = (file.document.children || []).map((p) => p.name).join(', ');
     throw new Error(`Page "${pageName}" not found. Available: ${available}`);
   }
 
   const frameRef = figmaClient.findFrameByName(page, frameName);
   if (!frameRef) {
     const available = (page.children || [])
-      .filter((c) => c.type === "FRAME" || c.type === "COMPONENT")
+      .filter((c) => c.type === 'FRAME' || c.type === 'COMPONENT')
       .map((f) => f.name)
-      .join(", ");
+      .join(', ');
     throw new Error(`Frame "${frameName}" not found. Available: ${available}`);
   }
 
@@ -490,7 +506,7 @@ export async function getFullPageContext(ctx, args) {
     const section = {
       id: `section-${idx}`,
       name: sectionName,
-      bgColor: sectionGroup.bgColor || "#FFFFFF",
+      bgColor: sectionGroup.bgColor || '#FFFFFF',
       bounds: {
         x: Math.round(sectionBounds.x),
         y: Math.round(sectionBounds.y),
@@ -559,11 +575,11 @@ export async function getFullPageContext(ctx, args) {
   }
 
   const response = chunker.wrapResponse(result, {
-    step: "Full page context prepared",
+    step: 'Full page context prepared',
     progress: `${sections.length} sections, ${totalAssets.icons} icons, ${totalAssets.images} images`,
-    nextStep: `Distribute to ${recommendedAgentCount} agent${recommendedAgentCount > 1 ? "s" : ""} for parallel implementation`,
+    nextStep: `Distribute to ${recommendedAgentCount} agent${recommendedAgentCount > 1 ? 's' : ''} for parallel implementation`,
     strategy: `Lazy-loaded context: screenshots=${include_screenshots}, assets=${include_assets}, styles=${include_styles}, instructions=${include_agent_instructions}`,
   });
 
-  return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
+  return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }] };
 }

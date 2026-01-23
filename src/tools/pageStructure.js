@@ -1,5 +1,5 @@
-import { colorToHex, extractFillInfo, countElements } from "../../utils/index.js";
-import { isIconNode, isImageNode, buildAssetName } from "../../utils/assetHelpers.js";
+import { colorToHex, extractFillInfo, countElements } from "../utils/index.js";
+import { isIconNode, isImageNode, buildAssetName } from "../utils/assetHelpers.js";
 
 const SECTION_KEYWORDS = {
   hero: ["hero", "header", "banner", "top", "welcome"],

@@ -1,6 +1,56 @@
-import { compareImages, getImageDimensions } from '../../../services/imageComparator.js';
+import { z } from 'zod';
+import { compareImages, getImageDimensions } from '../../services/imageComparator.js';
 
-export async function compareVisual(ctx, args) {
+export const name = 'compare_visual';
+
+export const description = `Pixel-by-pixel visual comparison between Figma and browser screenshots. Returns match_score (0-100), status, problematic regions (9-grid), fix recommendations. Default pass: 90%.`;
+
+const viewportObject = z.object({
+  width: z.number(),
+  height: z.number()
+});
+
+export const inputSchema = {
+  figma_file_key: z.string().describe('Figma file key from URL'),
+  figma_frame_name: z.string().optional().describe('Frame name to compare against (partial match)'),
+  figma_node_id: z.string().optional().describe('Alternative: specific node ID instead of frame name'),
+  browser_screenshot_base64: z.string().describe('Base64 encoded browser screenshot (from chrome-devtools.take_screenshot)'),
+  viewport: viewportObject.describe('Viewport dimensions that screenshot was taken at (must match Figma frame)'),
+  threshold: z.number().default(0.1).describe('Pixel difference threshold 0-1 (default: 0.1, lower = stricter)'),
+  pass_threshold: z.number().default(90).describe('Match percentage needed to PASS (default: 90%)')
+};
+
+function generateRecommendations(regions) {
+  const recommendations = [];
+
+  const hasCritical = regions.some(r => r.severity === 'critical');
+  const hasModerate = regions.some(r => r.severity === 'moderate');
+
+  if (hasCritical) {
+    recommendations.push('Check for missing elements in critical regions');
+    recommendations.push('Verify all images and icons are loading correctly');
+  }
+
+  if (hasModerate) {
+    recommendations.push('Check font family and weight matches Figma');
+    recommendations.push('Verify colors are exact hex values from Figma');
+    recommendations.push('Check spacing and padding values');
+  }
+
+  for (const region of regions.slice(0, 3)) {
+    if (region.area.includes('top')) {
+      recommendations.push(`Check header/navigation area (${region.area})`);
+    } else if (region.area.includes('bottom')) {
+      recommendations.push(`Check footer area (${region.area})`);
+    } else if (region.area === 'center') {
+      recommendations.push('Check main content area positioning');
+    }
+  }
+
+  return [...new Set(recommendations)];
+}
+
+export async function handler(args, ctx) {
   const { chunker, figmaClient, session } = ctx;
   const {
     figma_file_key,
@@ -8,8 +58,8 @@ export async function compareVisual(ctx, args) {
     figma_node_id,
     browser_screenshot_base64,
     viewport,
-    threshold = 0.1,
-    pass_threshold = 90
+    threshold,
+    pass_threshold
   } = args;
 
   if (!browser_screenshot_base64) {
@@ -60,15 +110,15 @@ export async function compareVisual(ctx, args) {
     if (!comparison.success) {
       return {
         content: [{
-          type: "text",
+          type: 'text',
           text: JSON.stringify({
-            status: "ERROR",
+            status: 'ERROR',
             error: comparison.error,
             message: comparison.message,
             details: comparison.details,
-            hint: comparison.error === "DIMENSION_MISMATCH"
-              ? "Use chrome-devtools.resize_page() to match Figma dimensions exactly"
-              : "Check that both images are valid"
+            hint: comparison.error === 'DIMENSION_MISMATCH'
+              ? 'Use chrome-devtools.resize_page() to match Figma dimensions exactly'
+              : 'Check that both images are valid'
           }, null, 2)
         }]
       };
@@ -77,7 +127,7 @@ export async function compareVisual(ctx, args) {
     const passed = comparison.matchScore >= pass_threshold;
 
     const result = {
-      status: passed ? "PASS" : "FAIL",
+      status: passed ? 'PASS' : 'FAIL',
       match_score: comparison.matchScore,
       pass_threshold,
       dimensions: comparison.dimensions,
@@ -95,54 +145,24 @@ export async function compareVisual(ctx, args) {
     }
 
     const response = chunker ? chunker.wrapResponse(result, {
-      step: "Visual comparison",
+      step: 'Visual comparison',
       progress: `Compared ${comparison.totalPixels} pixels`,
-      nextStep: passed ? "Proceed to next section" : "Fix visual issues and revalidate"
+      nextStep: passed ? 'Proceed to next section' : 'Fix visual issues and revalidate'
     }) : result;
 
     return {
-      content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify(response, null, 2) }]
     };
   } catch (error) {
     return {
       content: [{
-        type: "text",
+        type: 'text',
         text: JSON.stringify({
-          status: "ERROR",
+          status: 'ERROR',
           error: error.message,
-          hint: "Make sure Figma file_key is valid and frame exists"
+          hint: 'Make sure Figma file_key is valid and frame exists'
         }, null, 2)
       }]
     };
   }
-}
-
-function generateRecommendations(regions) {
-  const recommendations = [];
-
-  const hasCritical = regions.some(r => r.severity === 'critical');
-  const hasModerate = regions.some(r => r.severity === 'moderate');
-
-  if (hasCritical) {
-    recommendations.push("Check for missing elements in critical regions");
-    recommendations.push("Verify all images and icons are loading correctly");
-  }
-
-  if (hasModerate) {
-    recommendations.push("Check font family and weight matches Figma");
-    recommendations.push("Verify colors are exact hex values from Figma");
-    recommendations.push("Check spacing and padding values");
-  }
-
-  for (const region of regions.slice(0, 3)) {
-    if (region.area.includes('top')) {
-      recommendations.push(`Check header/navigation area (${region.area})`);
-    } else if (region.area.includes('bottom')) {
-      recommendations.push(`Check footer area (${region.area})`);
-    } else if (region.area === 'center') {
-      recommendations.push("Check main content area positioning");
-    }
-  }
-
-  return [...new Set(recommendations)];
 }
